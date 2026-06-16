@@ -393,7 +393,7 @@ function estimateMonthlyTaxes(grossAnnual, filingStatus, stateSlug) {
     if (grossAnnual <= 0) return 0;
     
     // 1. FICA TAX
-    var socialSecurity = Math.min(grossAnnual, 168600) * 0.062;
+    var socialSecurity = Math.min(grossAnnual, 184500) * 0.062;
     var medicareLimit = (filingStatus === "married") ? 250000 : 200000;
     var medicare = grossAnnual * 0.0145;
     if (grossAnnual > medicareLimit) {
@@ -401,12 +401,12 @@ function estimateMonthlyTaxes(grossAnnual, filingStatus, stateSlug) {
     }
     var totalFica = socialSecurity + medicare;
     
-    // 2. FEDERAL INCOME TAX (2024 progressive brackets)
-    var standardDeduction = 14600;
+    // 2. FEDERAL INCOME TAX (2026 progressive brackets)
+    var standardDeduction = 16100;
     if (filingStatus === "married") {
-        standardDeduction = 29200;
+        standardDeduction = 32200;
     } else if (filingStatus === "hoh") {
-        standardDeduction = 21900;
+        standardDeduction = 24150;
     }
     
     var taxableFederal = Math.max(0, grossAnnual - standardDeduction);
@@ -415,32 +415,32 @@ function estimateMonthlyTaxes(grossAnnual, filingStatus, stateSlug) {
     var brackets = [];
     if (filingStatus === "married") {
         brackets = [
-            { limit: 23200, rate: 0.10 },
-            { limit: 94300, rate: 0.12 },
-            { limit: 201050, rate: 0.22 },
-            { limit: 383900, rate: 0.24 },
-            { limit: 487450, rate: 0.32 },
-            { limit: 731200, rate: 0.35 },
+            { limit: 24800, rate: 0.10 },
+            { limit: 100800, rate: 0.12 },
+            { limit: 211400, rate: 0.22 },
+            { limit: 403550, rate: 0.24 },
+            { limit: 512450, rate: 0.32 },
+            { limit: 768700, rate: 0.35 },
             { limit: Infinity, rate: 0.37 }
         ];
     } else if (filingStatus === "hoh") {
         brackets = [
-            { limit: 16550, rate: 0.10 },
-            { limit: 63100, rate: 0.12 },
-            { limit: 100500, rate: 0.22 },
-            { limit: 191950, rate: 0.24 },
-            { limit: 243700, rate: 0.32 },
-            { limit: 609350, rate: 0.35 },
+            { limit: 17700, rate: 0.10 },
+            { limit: 67450, rate: 0.12 },
+            { limit: 105700, rate: 0.22 },
+            { limit: 201775, rate: 0.24 },
+            { limit: 256200, rate: 0.32 },
+            { limit: 640600, rate: 0.35 },
             { limit: Infinity, rate: 0.37 }
         ];
     } else {
         brackets = [
-            { limit: 11600, rate: 0.10 },
-            { limit: 47150, rate: 0.12 },
-            { limit: 100525, rate: 0.22 },
-            { limit: 191950, rate: 0.24 },
-            { limit: 243725, rate: 0.32 },
-            { limit: 609350, rate: 0.35 },
+            { limit: 12400, rate: 0.10 },
+            { limit: 50400, rate: 0.12 },
+            { limit: 105700, rate: 0.22 },
+            { limit: 201775, rate: 0.24 },
+            { limit: 256225, rate: 0.32 },
+            { limit: 640600, rate: 0.35 },
             { limit: Infinity, rate: 0.37 }
         ];
     }

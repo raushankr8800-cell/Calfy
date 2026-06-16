@@ -12,36 +12,36 @@ function ust_get_income_tax_data() {
     return [
         'federal' => [
             'standard_deduction' => [
-                'single' => 15750,
-                'married' => 31500,
-                'head' => 23625,
+                'single' => 16100,
+                'married' => 32200,
+                'head' => 24150,
             ],
             'brackets' => [
                 'single' => [
-                    ['limit' => 11925, 'rate' => 0.10],
-                    ['limit' => 48475, 'rate' => 0.12],
-                    ['limit' => 103350, 'rate' => 0.22],
-                    ['limit' => 197300, 'rate' => 0.24],
-                    ['limit' => 250525, 'rate' => 0.32],
-                    ['limit' => 626350, 'rate' => 0.35],
+                    ['limit' => 12400, 'rate' => 0.10],
+                    ['limit' => 50400, 'rate' => 0.12],
+                    ['limit' => 105700, 'rate' => 0.22],
+                    ['limit' => 201775, 'rate' => 0.24],
+                    ['limit' => 256225, 'rate' => 0.32],
+                    ['limit' => 640600, 'rate' => 0.35],
                     ['limit' => 999999999999, 'rate' => 0.37],
                 ],
                 'married' => [
-                    ['limit' => 23850, 'rate' => 0.10],
-                    ['limit' => 96950, 'rate' => 0.12],
-                    ['limit' => 206700, 'rate' => 0.22],
-                    ['limit' => 394600, 'rate' => 0.24],
-                    ['limit' => 501050, 'rate' => 0.32],
-                    ['limit' => 626350, 'rate' => 0.35],
+                    ['limit' => 24800, 'rate' => 0.10],
+                    ['limit' => 100800, 'rate' => 0.12],
+                    ['limit' => 211400, 'rate' => 0.22],
+                    ['limit' => 403550, 'rate' => 0.24],
+                    ['limit' => 512450, 'rate' => 0.32],
+                    ['limit' => 768700, 'rate' => 0.35],
                     ['limit' => 999999999999, 'rate' => 0.37],
                 ],
                 'head' => [
-                    ['limit' => 17000, 'rate' => 0.10],
-                    ['limit' => 64850, 'rate' => 0.12],
-                    ['limit' => 103350, 'rate' => 0.22],
-                    ['limit' => 197300, 'rate' => 0.24],
-                    ['limit' => 250500, 'rate' => 0.32],
-                    ['limit' => 626350, 'rate' => 0.35],
+                    ['limit' => 17700, 'rate' => 0.10],
+                    ['limit' => 67450, 'rate' => 0.12],
+                    ['limit' => 105700, 'rate' => 0.22],
+                    ['limit' => 201775, 'rate' => 0.24],
+                    ['limit' => 256200, 'rate' => 0.32],
+                    ['limit' => 640600, 'rate' => 0.35],
                     ['limit' => 999999999999, 'rate' => 0.37],
                 ]
             ]
@@ -120,7 +120,35 @@ function ust_get_federal_tax_years() {
             ],
             'ss_wage_base'       => 176100,
             'medicare_threshold' => ['single' => 200000, 'married' => 250000, 'head' => 200000],
-            'brackets'           => $base['federal']['brackets'],
+            'brackets'           => [
+                'single' => [
+                    ['limit' => 11925, 'rate' => 0.10],
+                    ['limit' => 48475, 'rate' => 0.12],
+                    ['limit' => 103350, 'rate' => 0.22],
+                    ['limit' => 197300, 'rate' => 0.24],
+                    ['limit' => 250525, 'rate' => 0.32],
+                    ['limit' => 626350, 'rate' => 0.35],
+                    ['limit' => 999999999999, 'rate' => 0.37],
+                ],
+                'married' => [
+                    ['limit' => 23850, 'rate' => 0.10],
+                    ['limit' => 96950, 'rate' => 0.12],
+                    ['limit' => 206700, 'rate' => 0.22],
+                    ['limit' => 394600, 'rate' => 0.24],
+                    ['limit' => 501050, 'rate' => 0.32],
+                    ['limit' => 626350, 'rate' => 0.35],
+                    ['limit' => 999999999999, 'rate' => 0.37],
+                ],
+                'head' => [
+                    ['limit' => 17000, 'rate' => 0.10],
+                    ['limit' => 64850, 'rate' => 0.12],
+                    ['limit' => 103350, 'rate' => 0.22],
+                    ['limit' => 197300, 'rate' => 0.24],
+                    ['limit' => 250500, 'rate' => 0.32],
+                    ['limit' => 626350, 'rate' => 0.35],
+                    ['limit' => 999999999999, 'rate' => 0.37],
+                ],
+            ],
         ],
         '2026' => [
             'standard_deduction' => [
@@ -175,8 +203,8 @@ function ust_calculate_income_tax($gross_income, $filing_status, $state_slug, $p
     $taxable_fed = max(0, $gross_income - $pretax);
 
     // 1. FICA Deductions
-    // Social Security (6.2% up to $176,100)
-    $ss_limit = 176100;
+    // Social Security (6.2% up to $184,500 for 2026)
+    $ss_limit = 184500;
     $ss_tax = min($gross_income, $ss_limit) * 0.062;
     // Medicare (1.45%, plus 0.9% additional over $200k for Single/Head, $250k for Married)
     $med_threshold = ($filing_status === 'married') ? 250000 : 200000;

@@ -106,7 +106,7 @@ function ust_get_other_tax_faqs($slug) {
         'federal-income-tax-calculator' => [
             ['q' => "What are the federal standard deductions for this tax year?", 'a' => "The standard deduction is $15,750 for Single, $31,500 for Married Filing Jointly, and $23,625 for Head of Household filers."],
             ['q' => "What is the difference between marginal and effective federal tax rates?", 'a' => "Marginal rate is the bracket percentage applied to your last dollar of income. Effective rate is the average rate paid: total tax divided by gross income."],
-            ['q' => "What consists of FICA taxes?", 'a' => "FICA consists of 6.2% Social Security tax (capped on earnings up to $176,100) and 1.45% Medicare tax (no cap)."],
+            ['q' => "What consists of FICA taxes?", 'a' => "FICA consists of 6.2% Social Security tax (capped on earnings up to $184,500 in 2026) and 1.45% Medicare tax (no cap)."],
             ['q' => "How do pre-tax deductions affect my federal tax?", 'a' => "Pre-tax deductions like 401(k) or HSA payments lower your Adjusted Gross Income (AGI), reducing the base on which your tax brackets are computed."],
             ['q' => "Who qualifies for the Head of Household filing status?", 'a' => "You must be unmarried, pay more than half the cost of keeping up a home, and have a qualifying dependent living with you for more than half the year."],
             ['q' => "Is there an additional Medicare tax for high earners?", 'a' => "Yes, an additional 0.9% Medicare tax is applied to wages exceeding $200,000 for Single and $250,000 for Married Filing Jointly."],

@@ -3,7 +3,7 @@
  * Plugin Name: USA State All-in-One Calculators
  * Plugin URI: #
  * Description: All-in-One premium SEO-optimized calculator suite for all 50 US states. Includes Paycheck, Child Support, Alimony, Mortgage, Income Tax, Property Tax, and Sales Tax calculators. Auto-creates CPT pages with state-specific content and customizable HTML/CSS/JS editors.
- * Version: 2.1.0
+ * Version: 2.2.0
  * Author: AI Assistant
  * Text Domain: usa-state-all-calculators
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 define('USC_PATH', plugin_dir_path(__FILE__));
 define('USC_URL',  plugin_dir_url(__FILE__));
-define('USC_VERSION', '2.1.0');
+define('USC_VERSION', '2.2.0');
 define('USC_CPT', 'usc_calculator');
 
 // ============================================================
@@ -25,7 +25,7 @@ define('USC_CPT', 'usc_calculator');
 
 define('UST_PATH', plugin_dir_path(__FILE__));
 define('UST_URL',  plugin_dir_url(__FILE__));
-define('UST_VERSION', '2.1.0');
+define('UST_VERSION', '2.2.0');
 define('UST_CPT', 'ust_calculator');
 
 // ============================================================
@@ -1405,7 +1405,7 @@ function usac_get_data_sources_registry() {
         'federal_income_tax' => [
             'label'    => 'Federal Income Tax Brackets',
             'covers'   => 'Paycheck, Alimony, Income Tax, Bonus & Other Tax calculators',
-            'year'     => '2025',
+            'year'     => '2026',
             'authority'=> 'IRS',
             'source'   => 'https://www.irs.gov/filing/federal-income-tax-rates-and-brackets',
             'cadence'  => 'Annually — new brackets released ~Oct/Nov for the next year',
@@ -1414,7 +1414,7 @@ function usac_get_data_sources_registry() {
         'standard_deduction' => [
             'label'    => 'Federal Standard Deduction',
             'covers'   => 'Paycheck, Alimony, Income Tax calculators',
-            'year'     => '2024',
+            'year'     => '2026',
             'authority'=> 'IRS',
             'source'   => 'https://www.irs.gov/newsroom',
             'cadence'  => 'Annually (inflation-adjusted)',
@@ -1423,7 +1423,7 @@ function usac_get_data_sources_registry() {
         'fica_ss_wage_base' => [
             'label'    => 'Social Security Wage Base (FICA cap)',
             'covers'   => 'Paycheck, Alimony, Income Tax calculators',
-            'year'     => '2024',
+            'year'     => '2026',
             'authority'=> 'SSA',
             'source'   => 'https://www.ssa.gov/oact/cola/cbb.html',
             'cadence'  => 'Annually — announced each October',
@@ -1432,7 +1432,7 @@ function usac_get_data_sources_registry() {
         'retirement_limits' => [
             'label'    => '401(k) / HSA / FSA Contribution Limits',
             'covers'   => 'Paycheck calculator (pre-tax deductions)',
-            'year'     => '2025',
+            'year'     => '2026',
             'authority'=> 'IRS',
             'source'   => 'https://www.irs.gov/retirement-plans',
             'cadence'  => 'Annually',
@@ -1525,7 +1525,22 @@ function usac_render_data_sources_page() {
                 echo '<div class="notice notice-success is-dismissible"><p><strong>' . esc_html($registry[$key]['label']) . '</strong> marked as reviewed today.</p></div>';
             }
         }
+
+        if ($action === 'save_reminder') {
+            update_option('usac_data_reminder_enabled', isset($_POST['usac_reminder_enabled']) ? '1' : '0');
+            $email = sanitize_email(wp_unslash($_POST['usac_reminder_email'] ?? ''));
+            update_option('usac_data_reminder_email', is_email($email) ? $email : '');
+            $days = (int) ($_POST['usac_reminder_days'] ?? 365);
+            if ($days < 30) $days = 30;
+            update_option('usac_data_reminder_days', $days);
+            echo '<div class="notice notice-success is-dismissible"><p><strong>Reminder settings saved.</strong></p></div>';
+        }
     }
+
+    $reminder_enabled = get_option('usac_data_reminder_enabled', '1');
+    $reminder_email   = get_option('usac_data_reminder_email', '');
+    if (!$reminder_email) $reminder_email = get_option('admin_email');
+    $reminder_days    = (int) get_option('usac_data_reminder_days', 365);
 
     // Build rows + summary counts
     $current = 0; $outdated = 0; $review_due = 0;
@@ -1608,9 +1623,113 @@ function usac_render_data_sources_page() {
             <tbody><?php echo $rows; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></tbody>
         </table>
 
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;margin-top:18px;max-width:680px;">
+            <h2 style="margin-top:0;font-size:15px;display:flex;align-items:center;gap:6px;">📧 Email reminders</h2>
+            <p style="font-size:12.5px;color:#374151;">Get an automatic email when any dataset falls behind the target year or hasn't been reviewed in a while. Checked daily; sent at most once a week.</p>
+            <form method="post">
+                <?php wp_nonce_field('usac_data_freshness', 'usac_data_nonce'); ?>
+                <input type="hidden" name="usac_data_action" value="save_reminder">
+                <p>
+                    <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;">
+                        <input type="checkbox" name="usac_reminder_enabled" value="1" <?php checked($reminder_enabled, '1'); ?>>
+                        <strong>Enable email reminders</strong>
+                    </label>
+                </p>
+                <p style="font-size:13px;">
+                    Send to: <input type="email" name="usac_reminder_email" value="<?php echo esc_attr($reminder_email); ?>" style="width:280px;padding:5px 8px;" placeholder="admin@example.com">
+                </p>
+                <p style="font-size:13px;">
+                    Also remind if a dataset hasn't been reviewed in
+                    <input type="number" name="usac_reminder_days" value="<?php echo esc_attr($reminder_days); ?>" min="30" style="width:80px;padding:5px 8px;"> days
+                </p>
+                <button type="submit" class="button button-primary">Save reminder settings</button>
+            </form>
+        </div>
+
         <p style="font-size:12px;color:#6b7280;margin-top:14px;">💡 Tip: after you update a dataset in the code files shown above, come back here and click <strong>"Mark reviewed today"</strong> so the date and your username are recorded.</p>
     </div>
     <?php
+}
+
+// ============================================================
+// DATA FRESHNESS — EMAIL REMINDER AUTOMATION (daily cron)
+// ============================================================
+
+// Ensure the daily check is scheduled.
+add_action('init', 'usac_schedule_data_freshness_check');
+function usac_schedule_data_freshness_check() {
+    if (!wp_next_scheduled('usac_data_freshness_cron')) {
+        wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'usac_data_freshness_cron');
+    }
+}
+
+add_action('usac_data_freshness_cron', 'usac_run_data_freshness_check');
+function usac_run_data_freshness_check() {
+    // Respect the admin toggle (on by default).
+    if (get_option('usac_data_reminder_enabled', '1') !== '1') {
+        return;
+    }
+
+    $registry    = usac_get_data_sources_registry();
+    $meta        = get_option('usac_data_freshness', []);
+    if (!is_array($meta)) $meta = [];
+    $target_year = (int) get_option('usac_data_target_year', '2026');
+    $max_age     = (int) get_option('usac_data_reminder_days', 365); // review-age threshold in days
+
+    $stale = [];
+    foreach ($registry as $key => $src) {
+        $eff_year = isset($meta[$key]['year']) ? (int) $meta[$key]['year'] : (int) $src['year'];
+        $reason   = '';
+        if ($eff_year < $target_year) {
+            $reason = 'Behind target year (' . $eff_year . ' < ' . $target_year . ')';
+        } else {
+            $last = isset($meta[$key]['last_reviewed']) ? $meta[$key]['last_reviewed'] : '';
+            if ($last) {
+                $age_days = (int) floor((current_time('timestamp') - strtotime($last)) / DAY_IN_SECONDS);
+                if ($age_days > $max_age) {
+                    $reason = 'Not reviewed for ' . $age_days . ' days';
+                }
+            } else {
+                $reason = 'Never reviewed';
+            }
+        }
+        if ($reason) {
+            $stale[] = ['label' => $src['label'], 'reason' => $reason, 'source' => $src['source']];
+        }
+    }
+
+    if (empty($stale)) {
+        return; // nothing to remind about
+    }
+
+    // Only send once every 7 days to avoid spamming.
+    $last_sent = (int) get_option('usac_data_reminder_last_sent', 0);
+    if ($last_sent && (time() - $last_sent) < 7 * DAY_IN_SECONDS) {
+        return;
+    }
+
+    $to = get_option('usac_data_reminder_email', '');
+    if (!is_email($to)) {
+        $to = get_option('admin_email');
+    }
+    $site  = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+    $admin_url = admin_url('admin.php?page=usac_data_sources');
+
+    $subject = '[' . $site . '] ' . count($stale) . ' calculator dataset(s) need review';
+    $lines = [];
+    $lines[] = 'The following tax/financial datasets used by your calculators may be out of date:';
+    $lines[] = '';
+    foreach ($stale as $s) {
+        $lines[] = '• ' . $s['label'] . ' — ' . $s['reason'];
+        $lines[] = '   Official source: ' . $s['source'];
+    }
+    $lines[] = '';
+    $lines[] = 'Review & update here: ' . $admin_url;
+    $lines[] = '';
+    $lines[] = 'You are receiving this because data-freshness reminders are enabled in the All Calculators Hub.';
+
+    wp_mail($to, $subject, implode("\n", $lines));
+    update_option('usac_data_reminder_last_sent', time());
 }
 
 // ============================================================
