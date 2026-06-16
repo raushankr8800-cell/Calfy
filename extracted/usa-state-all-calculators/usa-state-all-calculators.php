@@ -3,7 +3,7 @@
  * Plugin Name: USA State All-in-One Calculators
  * Plugin URI: #
  * Description: All-in-One premium SEO-optimized calculator suite for all 50 US states. Includes Paycheck, Child Support, Alimony, Mortgage, Income Tax, Property Tax, and Sales Tax calculators. Auto-creates CPT pages with state-specific content and customizable HTML/CSS/JS editors.
- * Version: 2.0.9
+ * Version: 2.1.0
  * Author: AI Assistant
  * Text Domain: usa-state-all-calculators
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 define('USC_PATH', plugin_dir_path(__FILE__));
 define('USC_URL',  plugin_dir_url(__FILE__));
-define('USC_VERSION', '2.0.9');
+define('USC_VERSION', '2.1.0');
 define('USC_CPT', 'usc_calculator');
 
 // ============================================================
@@ -25,7 +25,7 @@ define('USC_CPT', 'usc_calculator');
 
 define('UST_PATH', plugin_dir_path(__FILE__));
 define('UST_URL',  plugin_dir_url(__FILE__));
-define('UST_VERSION', '2.0.9');
+define('UST_VERSION', '2.1.0');
 define('UST_CPT', 'ust_calculator');
 
 // ============================================================
@@ -1316,6 +1316,7 @@ function usac_register_admin_menus() {
     add_submenu_page('usac_calculators_hub', 'Paycheck Analytics', 'Paycheck Analytics', 'manage_options', 'usc_usage_analytics', 'usc_render_usage_page');
     add_submenu_page('usac_calculators_hub', 'Tax Analytics', 'Tax Analytics', 'manage_options', 'ust_usage_analytics', 'ust_render_usage_page');
     add_submenu_page('usac_calculators_hub', 'Ads Settings', 'Ads Settings', 'manage_options', 'usac_ads_settings', 'usac_render_ads_settings_page');
+    add_submenu_page('usac_calculators_hub', 'Data Sources & Freshness', '📅 Data Freshness', 'manage_options', 'usac_data_sources', 'usac_render_data_sources_page');
 }
 
 // Parent menu highlight for both CPTs
@@ -1387,6 +1388,227 @@ function usac_render_ads_settings_page() {
                 </form>
             </div>
         </div>
+    </div>
+    <?php
+}
+
+// ============================================================
+// DATA SOURCES & FRESHNESS DASHBOARD
+// Tracks which tax/financial datasets each calculator relies on,
+// what year they represent, when they were last reviewed, and where
+// they live in the code. Does NOT touch any calculator output.
+// ============================================================
+
+function usac_get_data_sources_registry() {
+    // Default metadata describing every dataset the calculators depend on.
+    return [
+        'federal_income_tax' => [
+            'label'    => 'Federal Income Tax Brackets',
+            'covers'   => 'Paycheck, Alimony, Income Tax, Bonus & Other Tax calculators',
+            'year'     => '2025',
+            'authority'=> 'IRS',
+            'source'   => 'https://www.irs.gov/filing/federal-income-tax-rates-and-brackets',
+            'cadence'  => 'Annually — new brackets released ~Oct/Nov for the next year',
+            'code'     => 'data/income-tax.php, data/usc-default-templates.php, data/alimony.php, data/other-tax.php',
+        ],
+        'standard_deduction' => [
+            'label'    => 'Federal Standard Deduction',
+            'covers'   => 'Paycheck, Alimony, Income Tax calculators',
+            'year'     => '2024',
+            'authority'=> 'IRS',
+            'source'   => 'https://www.irs.gov/newsroom',
+            'cadence'  => 'Annually (inflation-adjusted)',
+            'code'     => 'data/usc-default-templates.php, data/alimony.php, data/income-tax.php',
+        ],
+        'fica_ss_wage_base' => [
+            'label'    => 'Social Security Wage Base (FICA cap)',
+            'covers'   => 'Paycheck, Alimony, Income Tax calculators',
+            'year'     => '2024',
+            'authority'=> 'SSA',
+            'source'   => 'https://www.ssa.gov/oact/cola/cbb.html',
+            'cadence'  => 'Annually — announced each October',
+            'code'     => 'data/alimony.php (168600), data/usc-default-templates.php',
+        ],
+        'retirement_limits' => [
+            'label'    => '401(k) / HSA / FSA Contribution Limits',
+            'covers'   => 'Paycheck calculator (pre-tax deductions)',
+            'year'     => '2025',
+            'authority'=> 'IRS',
+            'source'   => 'https://www.irs.gov/retirement-plans',
+            'cadence'  => 'Annually',
+            'code'     => 'data/usc-default-templates.php (tooltips & limits)',
+        ],
+        'state_income_tax' => [
+            'label'    => 'State Income Tax Brackets & Deductions',
+            'covers'   => 'Income Tax, Paycheck, State Income Tax calculators (50 states)',
+            'year'     => '2024',
+            'authority'=> 'State revenue departments',
+            'source'   => 'https://taxfoundation.org/data/all/state/state-income-tax-rates/',
+            'cadence'  => 'Annually',
+            'code'     => 'data/income-tax.php (states array)',
+        ],
+        'sales_tax' => [
+            'label'    => 'State & Local Sales Tax Rates',
+            'covers'   => 'Sales Tax calculator',
+            'year'     => '2025',
+            'authority'=> 'State revenue departments',
+            'source'   => 'https://taxfoundation.org/data/all/state/state-and-local-sales-tax-rates-2025/',
+            'cadence'  => 'Annually / when states change rates',
+            'code'     => 'data/sales-tax.php',
+        ],
+        'property_tax' => [
+            'label'    => 'Property Tax Rates (effective %)',
+            'covers'   => 'Property Tax calculator',
+            'year'     => '2024',
+            'authority'=> 'County assessors / Tax Foundation',
+            'source'   => 'https://taxfoundation.org/data/all/state/property-taxes-by-state-county/',
+            'cadence'  => 'Annually',
+            'code'     => 'data/property-tax.php',
+        ],
+        'mortgage' => [
+            'label'    => 'Mortgage Rates & Closing Costs',
+            'covers'   => 'Mortgage calculator',
+            'year'     => '2025',
+            'authority'=> 'Freddie Mac / state averages',
+            'source'   => 'https://www.freddiemac.com/pmms',
+            'cadence'  => 'Rates change weekly; closing-cost averages yearly',
+            'code'     => 'data/mortgage.php (mortgageStateDictionary)',
+        ],
+        'cost_of_living' => [
+            'label'    => 'Cost of Living Index',
+            'covers'   => 'Income Tax (COL adjuster), comparisons',
+            'year'     => '2024',
+            'authority'=> 'BEA / MERIC',
+            'source'   => 'https://meric.mo.gov/data/cost-living-data-series',
+            'cadence'  => 'Quarterly / annually',
+            'code'     => 'data/cost-of-living.php',
+        ],
+    ];
+}
+
+function usac_render_data_sources_page() {
+    if (!current_user_can('manage_options')) wp_die('Unauthorized user.');
+
+    $registry = usac_get_data_sources_registry();
+    $meta = get_option('usac_data_freshness', []);
+    if (!is_array($meta)) $meta = [];
+    $target_year = get_option('usac_data_target_year', '2026');
+
+    // Handle saves
+    if (isset($_POST['usac_data_action'])) {
+        if (!isset($_POST['usac_data_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['usac_data_nonce'])), 'usac_data_freshness')) {
+            wp_die('Security check failed.');
+        }
+        $action = sanitize_text_field(wp_unslash($_POST['usac_data_action']));
+
+        if ($action === 'save_target_year') {
+            $ty = preg_replace('/[^0-9]/', '', (string) ($_POST['usac_target_year'] ?? ''));
+            if (strlen($ty) === 4) {
+                update_option('usac_data_target_year', $ty);
+                $target_year = $ty;
+            }
+            echo '<div class="notice notice-success is-dismissible"><p><strong>Target tax year saved.</strong></p></div>';
+        }
+
+        if ($action === 'update_source') {
+            $key = sanitize_key($_POST['usac_source_key'] ?? '');
+            if (isset($registry[$key])) {
+                $year = preg_replace('/[^0-9]/', '', (string) ($_POST['usac_source_year'] ?? ''));
+                $note = sanitize_text_field(wp_unslash($_POST['usac_source_note'] ?? ''));
+                $meta[$key] = [
+                    'year'         => (strlen($year) === 4) ? $year : ($meta[$key]['year'] ?? $registry[$key]['year']),
+                    'last_reviewed'=> current_time('Y-m-d'),
+                    'reviewer'     => wp_get_current_user()->user_login,
+                    'note'         => $note,
+                ];
+                update_option('usac_data_freshness', $meta);
+                echo '<div class="notice notice-success is-dismissible"><p><strong>' . esc_html($registry[$key]['label']) . '</strong> marked as reviewed today.</p></div>';
+            }
+        }
+    }
+
+    // Build rows + summary counts
+    $current = 0; $outdated = 0; $review_due = 0;
+    $rows = '';
+    foreach ($registry as $key => $src) {
+        $eff_year = isset($meta[$key]['year']) ? $meta[$key]['year'] : $src['year'];
+        $last_reviewed = isset($meta[$key]['last_reviewed']) ? $meta[$key]['last_reviewed'] : '—';
+        $reviewer = isset($meta[$key]['reviewer']) ? $meta[$key]['reviewer'] : '';
+        $note = isset($meta[$key]['note']) ? $meta[$key]['note'] : '';
+
+        // Status
+        if ((int)$eff_year >= (int)$target_year) {
+            $status_label = 'Current'; $status_color = '#16a34a'; $status_bg = '#f0fdf4'; $current++;
+        } elseif ((int)$eff_year === (int)$target_year - 1) {
+            $status_label = 'Review due'; $status_color = '#b45309'; $status_bg = '#fffbeb'; $review_due++;
+        } else {
+            $status_label = 'Outdated'; $status_color = '#b91c1c'; $status_bg = '#fef2f2'; $outdated++;
+        }
+
+        // Reviewed-age flag
+        $age_html = '';
+        if ($last_reviewed !== '—') {
+            $days = (int) floor((current_time('timestamp') - strtotime($last_reviewed)) / DAY_IN_SECONDS);
+            $age_html = '<div style="font-size:11px;color:#6b7280;">' . esc_html($last_reviewed) . ($reviewer ? ' · ' . esc_html($reviewer) : '') . ' (' . $days . 'd ago)</div>';
+        } else {
+            $age_html = '<div style="font-size:11px;color:#b91c1c;">Never reviewed</div>';
+        }
+
+        $rows .= '<tr style="border-bottom:1px solid #e5e7eb;">'
+            . '<td style="padding:12px 10px;vertical-align:top;">'
+                . '<strong style="font-size:13px;">' . esc_html($src['label']) . '</strong>'
+                . '<div style="font-size:11.5px;color:#6b7280;margin-top:3px;">' . esc_html($src['covers']) . '</div>'
+                . ($note ? '<div style="font-size:11px;color:#374151;margin-top:4px;font-style:italic;">📝 ' . esc_html($note) . '</div>' : '')
+            . '</td>'
+            . '<td style="padding:12px 10px;vertical-align:top;text-align:center;font-weight:700;">' . esc_html($eff_year) . '</td>'
+            . '<td style="padding:12px 10px;vertical-align:top;text-align:center;"><span style="background:' . $status_bg . ';color:' . $status_color . ';font-weight:700;font-size:11.5px;padding:4px 10px;border-radius:20px;white-space:nowrap;">' . esc_html($status_label) . '</span>' . $age_html . '</td>'
+            . '<td style="padding:12px 10px;vertical-align:top;font-size:11.5px;color:#374151;">' . esc_html($src['cadence']) . '<div style="margin-top:4px;"><a href="' . esc_url($src['source']) . '" target="_blank" rel="noopener">Official source ↗</a></div></td>'
+            . '<td style="padding:12px 10px;vertical-align:top;"><code style="font-size:10.5px;background:#f3f4f6;padding:2px 5px;border-radius:4px;display:inline-block;">' . esc_html($src['code']) . '</code></td>'
+            . '<td style="padding:12px 10px;vertical-align:top;">'
+                . '<form method="post" style="display:flex;flex-direction:column;gap:6px;min-width:150px;">'
+                . wp_nonce_field('usac_data_freshness', 'usac_data_nonce', true, false)
+                . '<input type="hidden" name="usac_data_action" value="update_source">'
+                . '<input type="hidden" name="usac_source_key" value="' . esc_attr($key) . '">'
+                . '<input type="text" name="usac_source_year" value="' . esc_attr($eff_year) . '" maxlength="4" placeholder="Year" style="width:70px;padding:4px 6px;" />'
+                . '<input type="text" name="usac_source_note" value="' . esc_attr($note) . '" placeholder="Note (optional)" style="padding:4px 6px;" />'
+                . '<button type="submit" class="button button-primary" style="font-size:11.5px;">✔ Mark reviewed today</button>'
+                . '</form>'
+            . '</td>'
+            . '</tr>';
+    }
+    ?>
+    <div class="wrap usc-admin-wrap">
+        <h1 style="display:flex;align-items:center;gap:8px;">📅 Data Sources &amp; Freshness</h1>
+        <p style="font-size:13px;color:#374151;max-width:820px;">Track every tax/financial dataset your calculators rely on: which year it represents, when it was last reviewed, how often it changes, and exactly where to update it in the code. Set your <strong>target tax year</strong> below and any dataset behind it is flagged.</p>
+
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin:18px 0;">
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 20px;min-width:120px;"><div style="font-size:24px;font-weight:800;color:#16a34a;"><?php echo (int)$current; ?></div><div style="font-size:12px;color:#15803d;font-weight:600;">Current</div></div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 20px;min-width:120px;"><div style="font-size:24px;font-weight:800;color:#b45309;"><?php echo (int)$review_due; ?></div><div style="font-size:12px;color:#b45309;font-weight:600;">Review due</div></div>
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px 20px;min-width:120px;"><div style="font-size:24px;font-weight:800;color:#b91c1c;"><?php echo (int)$outdated; ?></div><div style="font-size:12px;color:#b91c1c;font-weight:600;">Outdated</div></div>
+            <form method="post" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:8px;">
+                <?php wp_nonce_field('usac_data_freshness', 'usac_data_nonce'); ?>
+                <input type="hidden" name="usac_data_action" value="save_target_year">
+                <label style="font-size:12px;font-weight:700;color:#1e40af;">Target tax year:</label>
+                <input type="text" name="usac_target_year" value="<?php echo esc_attr($target_year); ?>" maxlength="4" style="width:70px;padding:4px 6px;" />
+                <button type="submit" class="button">Save</button>
+            </form>
+        </div>
+
+        <table class="widefat" style="background:#fff;border-radius:10px;overflow:hidden;">
+            <thead>
+                <tr style="background:#f9fafb;">
+                    <th style="padding:10px;text-align:left;">Dataset</th>
+                    <th style="padding:10px;text-align:center;">Data year</th>
+                    <th style="padding:10px;text-align:center;">Status</th>
+                    <th style="padding:10px;text-align:left;">Update cadence</th>
+                    <th style="padding:10px;text-align:left;">Where in code</th>
+                    <th style="padding:10px;text-align:left;">Action</th>
+                </tr>
+            </thead>
+            <tbody><?php echo $rows; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></tbody>
+        </table>
+
+        <p style="font-size:12px;color:#6b7280;margin-top:14px;">💡 Tip: after you update a dataset in the code files shown above, come back here and click <strong>"Mark reviewed today"</strong> so the date and your username are recorded.</p>
     </div>
     <?php
 }
