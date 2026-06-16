@@ -2840,41 +2840,13 @@ function updateWithholdingPlanner() {
     const deductions = parseFloat(document.getElementById("wh-sim-deductions").value) || 0;
     const extraPerCheck = parseFloat(document.getElementById("wh-sim-extra").value) || 0;
 
-    const stdDeductions = { single: 15750, married: 31500, head: 23625 };
-    const stdDeduct = stdDeductions[status];
+    const fy = federalYears[USAC_FED_YEAR] || federalYears["2026"];
+    const stdDeduct = (fy.standard_deduction && fy.standard_deduction[status]) ? fy.standard_deduction[status] : fy.standard_deduction["single"];
 
     // Original tax
     const originalAnnual = gross * freq;
     const originalTaxable = Math.max(0, originalAnnual - stdDeduct);
-    const brackets = {
-        single: [
-            { limit: 11925, rate: 0.10 },
-            { limit: 48475, rate: 0.12 },
-            { limit: 103350, rate: 0.22 },
-            { limit: 197300, rate: 0.24 },
-            { limit: 250525, rate: 0.32 },
-            { limit: 626350, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ],
-        married: [
-            { limit: 23850, rate: 0.10 },
-            { limit: 96950, rate: 0.12 },
-            { limit: 206700, rate: 0.22 },
-            { limit: 394600, rate: 0.24 },
-            { limit: 501050, rate: 0.32 },
-            { limit: 626350, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ],
-        head: [
-            { limit: 17000, rate: 0.10 },
-            { limit: 64850, rate: 0.12 },
-            { limit: 103350, rate: 0.22 },
-            { limit: 197300, rate: 0.24 },
-            { limit: 250500, rate: 0.32 },
-            { limit: 626350, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ]
-    };
+    const brackets = fy.brackets;
 
     function calculateBaseTax(taxableAmt) {
         let tax = 0;
@@ -3335,7 +3307,7 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
 </div>';
 
-            $data['js'] = '
+            $data['js'] = 'const federalYears = ' . json_encode(ust_get_federal_tax_years()) . '; var USAC_FED_YEAR = "' . esc_js(usac_get_active_tax_year()) . '";
 function drawCgBars(shortTax, longTax) {
     const svg = document.getElementById("cg-bar-svg");
     if (!svg) return;
@@ -3428,14 +3400,9 @@ function calculateCapitalGains() {
 
     const gain = Math.max(0, sale - basis);
 
-    // Ordinary 2025 federal brackets (short-term gains taxed as ordinary income, stacked on top of other income)
-    const ordBrackets = (status === "married") ? [
-        { limit: 23850, rate: 0.10 }, { limit: 96950, rate: 0.12 }, { limit: 206700, rate: 0.22 },
-        { limit: 394600, rate: 0.24 }, { limit: 501050, rate: 0.32 }, { limit: 626350, rate: 0.35 }, { limit: Infinity, rate: 0.37 }
-    ] : [
-        { limit: 11925, rate: 0.10 }, { limit: 48475, rate: 0.12 }, { limit: 103350, rate: 0.22 },
-        { limit: 197300, rate: 0.24 }, { limit: 250525, rate: 0.32 }, { limit: 626350, rate: 0.35 }, { limit: Infinity, rate: 0.37 }
-    ];
+    // Ordinary federal brackets (centralized; short-term gains taxed as ordinary income)
+    const cgFy = federalYears[USAC_FED_YEAR] || federalYears["2026"];
+    const ordBrackets = cgFy.brackets[(status === "married") ? "married" : (status === "head") ? "head" : "single"];
     function ordTax(income) {
         let t = 0, prev = 0;
         for (let i = 0; i < ordBrackets.length; i++) {
@@ -3608,12 +3575,12 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
 </div>';
 
-            $data['js'] = '
+            $data['js'] = 'var USAC_SS_CAP = ' . (int) (ust_get_federal_tax_years()[usac_get_active_tax_year()]['ss_wage_base'] ?? 184500) . ';
 function calculateSE() {
     const earnings = parseFloat(document.getElementById("se-earnings").value) || 0;
 
     const taxable = earnings * 0.9235;
-    const ssPortion = Math.min(taxable, 176100) * 0.124;
+    const ssPortion = Math.min(taxable, USAC_SS_CAP) * 0.124;
     const medPortion = taxable * 0.029;
     const totalTax = ssPortion + medPortion;
     const deduction = totalTax / 2;
@@ -3643,7 +3610,7 @@ function calculateSE() {
 function updateScorpOptimizer() {
     const earnings = parseFloat(document.getElementById("se-earnings").value) || 0;
     const salaryInput = parseFloat(document.getElementById("se-scorp-salary").value) || 0;
-    const ssCap = 176100;
+    const ssCap = USAC_SS_CAP;
 
     // Sole-proprietor SE tax on 92.35% of net earnings
     const seTaxable = earnings * 0.9235;
@@ -3663,14 +3630,14 @@ function updateSeDeductionPlanner() {
     
     // Original tax
     const taxable1 = earnings * 0.9235;
-    const ss1 = Math.min(taxable1, 176100) * 0.124;
+    const ss1 = Math.min(taxable1, USAC_SS_CAP) * 0.124;
     const med1 = taxable1 * 0.029;
     const tax1 = ss1 + med1;
     
     // Tax after expenses
     const profit2 = Math.max(0, earnings - simExpenses);
     const taxable2 = profit2 * 0.9235;
-    const ss2 = Math.min(taxable2, 176100) * 0.124;
+    const ss2 = Math.min(taxable2, USAC_SS_CAP) * 0.124;
     const med2 = taxable2 * 0.029;
     const tax2 = ss2 + med2;
     
@@ -3772,12 +3739,12 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
 </div>';
 
-            $data['js'] = '
+            $data['js'] = 'var USAC_SS_CAP = ' . (int) (ust_get_federal_tax_years()[usac_get_active_tax_year()]['ss_wage_base'] ?? 184500) . ';
 function calculatePayroll() {
     const salary = parseFloat(document.getElementById("pr-salary").value) || 0;
 
     // Employee FICA
-    const ssTaxable = Math.min(salary, 176100);
+    const ssTaxable = Math.min(salary, USAC_SS_CAP);
     const ssEmployee = ssTaxable * 0.062;
     const medEmployee = salary * 0.0145;
     const employeeFica = ssEmployee + medEmployee;

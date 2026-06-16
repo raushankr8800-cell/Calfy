@@ -100,7 +100,7 @@ if ($state_info && empty($post_content)) {
 }
 
 $template_ver = get_post_meta($post_id, '_ust_template_version', true);
-$expected_ver = '30-' . get_option('usac_data_rev', '0');
+$expected_ver = '31-' . get_option('usac_data_rev', '0');
 if (empty($calc_html) || empty($calc_js) || $template_ver !== $expected_ver) {
     $defaults = ust_get_default_templates($calc_type, $state_slug);
     $calc_html = $defaults['html'];

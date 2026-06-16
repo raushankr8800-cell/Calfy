@@ -104,7 +104,7 @@ if ($state_info && $content_outdated) {
 }
 
 $template_ver = get_post_meta($post_id, '_usc_template_version', true);
-$expected_ver = '30-' . get_option('usac_data_rev', '0');
+$expected_ver = '31-' . get_option('usac_data_rev', '0');
 
 $is_outdated = false;
 if ($template_ver !== $expected_ver) {

@@ -3,7 +3,7 @@
  * Plugin Name: USA State All-in-One Calculators
  * Plugin URI: #
  * Description: All-in-One premium SEO-optimized calculator suite for all 50 US states. Includes Paycheck, Child Support, Alimony, Mortgage, Income Tax, Property Tax, and Sales Tax calculators. Auto-creates CPT pages with state-specific content and customizable HTML/CSS/JS editors.
- * Version: 2.6.0
+ * Version: 2.6.1
  * Author: AI Assistant
  * Text Domain: usa-state-all-calculators
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 define('USC_PATH', plugin_dir_path(__FILE__));
 define('USC_URL',  plugin_dir_url(__FILE__));
-define('USC_VERSION', '2.6.0');
+define('USC_VERSION', '2.6.1');
 define('USC_CPT', 'usc_calculator');
 
 // ============================================================
@@ -25,7 +25,7 @@ define('USC_CPT', 'usc_calculator');
 
 define('UST_PATH', plugin_dir_path(__FILE__));
 define('UST_URL',  plugin_dir_url(__FILE__));
-define('UST_VERSION', '2.6.0');
+define('UST_VERSION', '2.6.1');
 define('UST_CPT', 'ust_calculator');
 
 // ============================================================
@@ -553,6 +553,7 @@ function usac_activate_plugin() {
 
 register_deactivation_hook(__FILE__, 'usac_deactivate_plugin');
 function usac_deactivate_plugin() {
+    wp_clear_scheduled_hook('usac_data_freshness_cron');
     flush_rewrite_rules();
 }
 
