@@ -184,6 +184,16 @@ body.usc-embed-mode .usc-card:not(:first-child),body.usc-embed-mode .usc-dark-to
   .usc-dark-toggle,.usc-tool-actions,.usc-action-buttons,.usc-comparison-box,#ust-col-adjuster,.usc-global-ad-container,.usc-read-full-wrap,#ust-lead-capture-box{display:none !important}
   body,.usc-calculator-page-wrapper{background:#fff !important}
 }
+/* Responsive guards: stop horizontal overflow / page-shrink on mobile */
+.usc-calculator-page-wrapper{overflow-x:hidden;max-width:100%}
+.usc-calculator-page-wrapper img,.usc-calculator-page-wrapper canvas,.usc-calculator-page-wrapper svg{max-width:100% !important;height:auto}
+.usc-calculator-page-wrapper table{max-width:100%;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.usc-calculator-page-wrapper pre{white-space:pre-wrap;word-break:break-word}
+.usc-calculator-page-wrapper .results,.usc-calculator-page-wrapper #results,.usc-calculator-page-wrapper .det{max-width:100%;overflow-x:auto}
+@media(max-width:640px){
+  .usc-calculator-page-wrapper .grid2{display:grid !important;grid-template-columns:1fr !important;gap:10px}
+  .usc-calculator-page-wrapper .page,.usc-calculator-page-wrapper .inner,.usc-calculator-page-wrapper .wrap{max-width:100% !important}
+}
 </style>';
 ?>
 <div class="usc-calculator-page-wrapper">
