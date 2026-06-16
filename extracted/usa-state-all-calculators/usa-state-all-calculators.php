@@ -3,7 +3,7 @@
  * Plugin Name: USA State All-in-One Calculators
  * Plugin URI: #
  * Description: All-in-One premium SEO-optimized calculator suite for all 50 US states. Includes Paycheck, Child Support, Alimony, Mortgage, Income Tax, Property Tax, and Sales Tax calculators. Auto-creates CPT pages with state-specific content and customizable HTML/CSS/JS editors.
- * Version: 2.4.0
+ * Version: 2.5.0
  * Author: AI Assistant
  * Text Domain: usa-state-all-calculators
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 define('USC_PATH', plugin_dir_path(__FILE__));
 define('USC_URL',  plugin_dir_url(__FILE__));
-define('USC_VERSION', '2.4.0');
+define('USC_VERSION', '2.5.0');
 define('USC_CPT', 'usc_calculator');
 
 // ============================================================
@@ -25,7 +25,7 @@ define('USC_CPT', 'usc_calculator');
 
 define('UST_PATH', plugin_dir_path(__FILE__));
 define('UST_URL',  plugin_dir_url(__FILE__));
-define('UST_VERSION', '2.4.0');
+define('UST_VERSION', '2.5.0');
 define('UST_CPT', 'ust_calculator');
 
 // ============================================================
@@ -1590,6 +1590,52 @@ function usac_render_data_sources_page() {
             }
             echo '<div class="notice notice-success is-dismissible"><p><strong>Reset ' . esc_html($year) . ' to built-in defaults.</strong></p></div>';
         }
+
+        if ($action === 'save_state') {
+            $slug = sanitize_key($_POST['usac_state_slug'] ?? '');
+            $all  = ust_get_income_tax_data_defaults();
+            if (isset($all['states'][$slug])) {
+                $sov = get_option('usac_state_overrides', []);
+                if (!is_array($sov)) $sov = [];
+                $entry = [];
+                $type = sanitize_key($_POST['usac_state_type'] ?? '');
+                if (in_array($type, ['none', 'flat', 'graduated'], true)) $entry['type'] = $type;
+                $ded = preg_replace('/[^0-9.]/', '', (string) ($_POST['usac_state_deduction'] ?? ''));
+                if ($ded !== '') $entry['deduction'] = (float) $ded;
+                $flat = (string) ($_POST['usac_state_flatrate'] ?? '');
+                if ($flat !== '') {
+                    $flat = (float) preg_replace('/[^0-9.]/', '', $flat);
+                    if ($flat > 1) $flat = $flat / 100;
+                    $entry['flat_rate'] = $flat;
+                }
+                $arr = [];
+                foreach (preg_split('/\r\n|\r|\n/', (string) wp_unslash($_POST['usac_state_brackets'] ?? '')) as $line) {
+                    $line = trim($line);
+                    if ($line === '') continue;
+                    $parts = array_map('trim', explode(',', $line));
+                    if (count($parts) < 2) continue;
+                    $ls = strtolower($parts[0]);
+                    $lim = (strpos($ls, 'max') !== false || strpos($ls, 'inf') !== false) ? 999999999999 : (float) preg_replace('/[^0-9.]/', '', $parts[0]);
+                    $rate = (float) preg_replace('/[^0-9.]/', '', $parts[1]);
+                    if ($rate > 1) $rate = $rate / 100;
+                    if ($lim > 0) $arr[] = ['limit' => $lim, 'rate' => $rate];
+                }
+                if ($arr) $entry['brackets'] = $arr;
+                $sov[$slug] = $entry;
+                update_option('usac_state_overrides', $sov);
+                echo '<div class="notice notice-success is-dismissible"><p><strong>' . esc_html(ucwords(str_replace('-', ' ', $slug))) . ' state income tax saved.</strong> The income tax calculator now uses it.</p></div>';
+            }
+        }
+
+        if ($action === 'reset_state') {
+            $slug = sanitize_key($_POST['usac_state_slug'] ?? '');
+            $sov = get_option('usac_state_overrides', []);
+            if (is_array($sov) && isset($sov[$slug])) {
+                unset($sov[$slug]);
+                update_option('usac_state_overrides', $sov);
+            }
+            echo '<div class="notice notice-success is-dismissible"><p><strong>Reset that state to built-in defaults.</strong></p></div>';
+        }
     }
 
     $reminder_enabled = get_option('usac_data_reminder_enabled', '1');
@@ -1610,6 +1656,14 @@ function usac_render_data_sources_page() {
         }
         return implode("\n", $out);
     };
+
+    // Prefill for the per-state income-tax editor
+    $all_states = ust_get_income_tax_data()['states'];
+    $sel_state  = isset($_GET['edit_state']) ? sanitize_key(wp_unslash($_GET['edit_state'])) : 'california';
+    if (!isset($all_states[$sel_state])) { $sk = array_keys($all_states); $sel_state = (string) reset($sk); }
+    $st = $all_states[$sel_state];
+    $st_brackets_text = !empty($st['brackets']) ? $fmt_brackets($st['brackets']) : '';
+    $st_flat_display  = isset($st['flat_rate']) ? rtrim(rtrim(number_format($st['flat_rate'] * 100, 3, '.', ''), '0'), '.') : '';
 
     // Build rows + summary counts
     $current = 0; $outdated = 0; $review_due = 0;
@@ -1739,7 +1793,41 @@ function usac_render_data_sources_page() {
                     <button type="submit" name="usac_data_action" value="reset_federal" class="button" onclick="return confirm('Reset this year to built-in defaults?');" style="color:#b91c1c;">Reset to defaults</button>
                 </div>
             </form>
-            <p style="font-size:11.5px;color:#6b7280;margin-top:10px;">Note: 401(k)/HSA/FSA limits shown in calculator tooltips are informational text; state income-tax tables are edited per state in <code>data/income-tax.php</code>.</p>
+            <p style="font-size:11.5px;color:#6b7280;margin-top:10px;">Note: 401(k)/HSA/FSA limits shown in calculator tooltips are informational text. State income-tax tables are editable below.</p>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;margin-top:18px;max-width:820px;">
+            <h2 style="margin-top:0;font-size:15px;display:flex;align-items:center;gap:6px;">🗺️ Edit state income tax — no code needed</h2>
+            <p style="font-size:12.5px;color:#374151;">Pick a state and update its income-tax rule. Saved values are used by the Income Tax &amp; Paycheck calculators automatically.</p>
+            <form method="get" style="margin-bottom:12px;">
+                <input type="hidden" name="page" value="usac_data_sources">
+                <label style="font-size:13px;font-weight:700;">State: </label>
+                <select name="edit_state" onchange="this.form.submit()" style="padding:5px 8px;">
+                    <?php foreach ($all_states as $slug => $info) { echo '<option value="' . esc_attr($slug) . '" ' . selected($slug, $sel_state, false) . '>' . esc_html(ucwords(str_replace('-', ' ', $slug))) . '</option>'; } ?>
+                </select>
+            </form>
+            <form method="post">
+                <?php wp_nonce_field('usac_data_freshness', 'usac_data_nonce'); ?>
+                <input type="hidden" name="usac_data_action" value="save_state">
+                <input type="hidden" name="usac_state_slug" value="<?php echo esc_attr($sel_state); ?>">
+                <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;">
+                    <label style="font-size:12.5px;">Tax type<br>
+                        <select name="usac_state_type" style="padding:5px 8px;">
+                            <option value="none" <?php selected(($st['type'] ?? ''), 'none'); ?>>No income tax</option>
+                            <option value="flat" <?php selected(($st['type'] ?? ''), 'flat'); ?>>Flat rate</option>
+                            <option value="graduated" <?php selected(($st['type'] ?? ''), 'graduated'); ?>>Graduated brackets</option>
+                        </select>
+                    </label>
+                    <label style="font-size:12.5px;">Standard deduction<br><input type="text" name="usac_state_deduction" value="<?php echo esc_attr($st['deduction'] ?? ''); ?>" style="width:120px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Flat rate %<br><input type="text" name="usac_state_flatrate" value="<?php echo esc_attr($st_flat_display); ?>" style="width:90px;padding:5px 8px;"></label>
+                </div>
+                <p style="font-size:12px;color:#6b7280;margin:14px 0 4px;">Graduated brackets — one per line as <code>upperLimit,ratePercent</code> (use <code>max</code> for the top bracket). Leave blank for flat / no-tax states.</p>
+                <textarea name="usac_state_brackets" rows="6" style="width:280px;font-family:monospace;font-size:12px;padding:6px;"><?php echo esc_textarea($st_brackets_text); ?></textarea>
+                <div style="margin-top:14px;display:flex;gap:10px;">
+                    <button type="submit" class="button button-primary">Save state</button>
+                    <button type="submit" name="usac_data_action" value="reset_state" class="button" onclick="return confirm('Reset this state to built-in defaults?');" style="color:#b91c1c;">Reset state</button>
+                </div>
+            </form>
         </div>
 
         <p style="font-size:12px;color:#6b7280;margin-top:14px;">💡 Tip: after you update a dataset in the code files shown above, come back here and click <strong>"Mark reviewed today"</strong> so the date and your username are recorded.</p>

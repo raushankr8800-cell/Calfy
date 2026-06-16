@@ -696,3 +696,18 @@
 .usc-compare-table tr.usc-compare-result td { background: #fff7ed; font-weight: 700; color: #b45309; }
 .usc-compare-table td:first-child, .usc-compare-table th:first-child { position: sticky; left: 0; background: #fff; }
 .usc-compare-table thead th:first-child { background: #f9fafb; }
+
+
+/* ==========================================================================
+   RESULT SECTION POLISH (visual only, additive — does not change any logic)
+   ========================================================================== */
+.results { animation: uscResultIn .4s ease both; }
+@keyframes uscResultIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.hero-card { transition: transform .18s ease, box-shadow .18s ease; }
+.hero-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(220,38,38,0.22); }
+.det-card { transition: box-shadow .18s ease; }
+.det-card:hover { box-shadow: 0 4px 16px rgba(15,52,96,0.08); }
+/* Zebra striping for plain result tables (inline-styled rows keep their colour) */
+.comp-table tbody tr:nth-child(even) { background: #fafafa; }
+.comp-table tbody tr:hover { background: #fff7ed; }
+.comp-table th { letter-spacing: .02em; }

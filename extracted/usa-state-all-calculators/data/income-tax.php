@@ -6,9 +6,31 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Returns standard deductions, bracket thresholds, and rates for federal and all 50 states
+ * Returns income tax data (federal + 50 states) with admin STATE overrides
+ * (option 'usac_state_overrides') merged in, so state figures can be edited
+ * from the dashboard without touching code.
  */
 function ust_get_income_tax_data() {
+    $data = ust_get_income_tax_data_defaults();
+    $ov   = get_option('usac_state_overrides', []);
+    if (is_array($ov)) {
+        foreach ($ov as $slug => $vals) {
+            if (!is_array($vals) || !isset($data['states'][$slug])) continue;
+            $s = $data['states'][$slug];
+            if (!empty($vals['type']))                                  $s['type']      = sanitize_key($vals['type']);
+            if (isset($vals['deduction']) && is_numeric($vals['deduction'])) $s['deduction'] = (float) $vals['deduction'];
+            if (isset($vals['flat_rate']) && is_numeric($vals['flat_rate'])) $s['flat_rate'] = (float) $vals['flat_rate'];
+            if (!empty($vals['brackets']) && is_array($vals['brackets']))    $s['brackets']  = $vals['brackets'];
+            $data['states'][$slug] = $s;
+        }
+    }
+    return $data;
+}
+
+/**
+ * Returns standard deductions, bracket thresholds, and rates for federal and all 50 states
+ */
+function ust_get_income_tax_data_defaults() {
     return [
         'federal' => [
             'standard_deduction' => [
