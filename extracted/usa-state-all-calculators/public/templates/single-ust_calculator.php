@@ -112,6 +112,15 @@ $state_name = isset($states[$state_slug]) ? $states[$state_slug]['name'] : 'USA'
 if (!empty($calc_css)) {
     echo '<style>' . $calc_css . '</style>';
 }
+
+// Critical tooltip CSS injected inline so it never depends on a cached external stylesheet
+echo '<style>
+.ust-tooltip{position:relative;display:inline-block;cursor:pointer;margin-left:6px;color:#6b7280;font-size:13px;line-height:1;vertical-align:middle;-webkit-tap-highlight-color:transparent}
+.ust-tooltip .ust-tooltiptext{visibility:hidden;opacity:0;width:220px;max-width:72vw;background:#1e293b;color:#fff;text-align:left;border-radius:6px;padding:8px 10px;position:absolute;z-index:9999;bottom:125%;left:50%;margin-left:-110px;transition:opacity .2s;font-size:11px;line-height:1.4;font-weight:400;box-shadow:0 4px 12px rgba(0,0,0,.15);font-family:inherit;pointer-events:none}
+.ust-tooltip .ust-tooltiptext::after{content:"";position:absolute;top:100%;left:50%;margin-left:-5px;border-width:5px;border-style:solid;border-color:#1e293b transparent transparent transparent}
+.ust-tooltip:hover .ust-tooltiptext,.ust-tooltip:focus .ust-tooltiptext,.ust-tooltip.ust-tooltip-open .ust-tooltiptext{visibility:visible;opacity:1}
+@media(max-width:600px){.ust-tooltip .ust-tooltiptext{width:200px;margin-left:-100px}}
+</style>';
 ?>
 <div class="usc-calculator-page-wrapper">
     <div class="page" style="padding: 20px 10px;">

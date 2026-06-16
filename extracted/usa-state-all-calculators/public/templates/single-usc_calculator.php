@@ -133,6 +133,15 @@ $post_title = get_the_title();
 if (!empty($calc_css)) {
     echo '<style>' . $calc_css . '</style>';
 }
+
+// Critical tooltip CSS injected inline so it never depends on a cached external stylesheet
+echo '<style>
+.usc-tooltip-wrap{position:relative;display:inline-block;cursor:pointer;margin-left:6px;font-size:13px;line-height:1;vertical-align:middle;-webkit-tap-highlight-color:transparent;user-select:none}
+.usc-tooltip-wrap::after{content:attr(data-tooltip);visibility:hidden;opacity:0;position:absolute;z-index:9999;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:10px;width:230px;max-width:72vw;background:#1e293b;color:#fff;text-align:left;border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.45;font-weight:400;white-space:normal;box-shadow:0 4px 12px rgba(0,0,0,.15);transition:opacity .2s ease;pointer-events:none}
+.usc-tooltip-wrap::before{content:"";visibility:hidden;opacity:0;position:absolute;z-index:9999;bottom:100%;left:50%;transform:translateX(-50%);border-width:5px;border-style:solid;border-color:#1e293b transparent transparent transparent;transition:opacity .2s ease;pointer-events:none}
+.usc-tooltip-wrap:hover::after,.usc-tooltip-wrap:hover::before,.usc-tooltip-wrap:focus::after,.usc-tooltip-wrap:focus::before,.usc-tooltip-wrap.usc-tooltip-open::after,.usc-tooltip-wrap.usc-tooltip-open::before{visibility:visible;opacity:1}
+@media(max-width:600px){.usc-tooltip-wrap::after{width:200px}}
+</style>';
 ?>
 <div class="usc-calculator-page-wrapper">
     <div class="page">
