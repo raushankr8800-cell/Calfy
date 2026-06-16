@@ -3,7 +3,12 @@
  * Single post template fallback for USA State Calculators
  */
 
-get_header();
+$usc_is_embed = (isset($_GET['embed']) && $_GET['embed'] === '1');
+if ($usc_is_embed) {
+    ?><!DOCTYPE html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>"><meta name="viewport" content="width=device-width, initial-scale=1"><?php wp_head(); ?></head><body <?php body_class('usc-embed-mode'); ?>><?php
+} else {
+    get_header();
+}
 
 $post_id = get_the_ID();
 $calc_type = get_post_meta($post_id, '_usc_calc_type', true);
@@ -142,8 +147,72 @@ echo '<style>
 .usc-tooltip-wrap:hover::after,.usc-tooltip-wrap:hover::before,.usc-tooltip-wrap:focus::after,.usc-tooltip-wrap:focus::before,.usc-tooltip-wrap.usc-tooltip-open::after,.usc-tooltip-wrap.usc-tooltip-open::before{visibility:visible;opacity:1}
 @media(max-width:600px){.usc-tooltip-wrap::after{width:200px}}
 </style>';
+
+/* ---- JSON-LD structured data for SEO (conflict-safe) ---- */
+$usc_seo_plugin_active = defined('WPSEO_VERSION') || defined('RANK_MATH_VERSION') || defined('AIOSEO_VERSION') || defined('SEOPRESS_VERSION');
+$usc_permalink = get_permalink($post_id);
+$usc_graph = [];
+$usc_graph[] = [
+    '@type' => 'WebApplication',
+    'name' => $post_title,
+    'url' => $usc_permalink,
+    'applicationCategory' => 'FinanceApplication',
+    'operatingSystem' => 'All',
+    'browserRequirements' => 'Requires JavaScript',
+    'offers' => ['@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'USD'],
+    'description' => $seo_desc ? $seo_desc : $post_title,
+];
+$usc_graph[] = [
+    '@type' => 'BreadcrumbList',
+    'itemListElement' => [
+        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => home_url('/')],
+        ['@type' => 'ListItem', 'position' => 2, 'name' => $post_title, 'item' => $usc_permalink],
+    ],
+];
+// Only add FAQ schema if no SEO plugin already outputs it (avoids duplicate-markup conflicts)
+if (!$usc_seo_plugin_active && !empty($faqs) && is_array($faqs)) {
+    $usc_faq_items = [];
+    foreach ($faqs as $faq) {
+        if (empty($faq['q']) || empty($faq['a'])) continue;
+        $usc_faq_items[] = [
+            '@type' => 'Question',
+            'name' => wp_strip_all_tags($faq['q']),
+            'acceptedAnswer' => ['@type' => 'Answer', 'text' => wp_strip_all_tags($faq['a'])],
+        ];
+    }
+    if (!empty($usc_faq_items)) {
+        $usc_graph[] = ['@type' => 'FAQPage', 'mainEntity' => $usc_faq_items];
+    }
+}
+echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@graph' => $usc_graph]) . '</script>';
+
+/* ---- Feature styles: share/embed buttons, dark mode, print, embed ---- */
+echo '<style>
+.usc-tool-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px}
+.usc-tool-btn{display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:1.5px solid #e5e7eb;background:#fff;color:#374151;font-weight:700;font-size:13px;padding:9px 16px;border-radius:8px;transition:all .15s ease;font-family:inherit}
+.usc-tool-btn:hover{border-color:#dc2626;color:#dc2626;transform:translateY(-1px)}
+.usc-dark-toggle{position:fixed;right:16px;bottom:16px;z-index:9998;width:46px;height:46px;border-radius:50%;border:none;background:#1e293b;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;line-height:1}
+.usc-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:10000;opacity:0;pointer-events:none;transition:all .25s ease;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.usc-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.usc-dark .usc-calculator-page-wrapper,.usc-calculator-page-wrapper.usc-dark{background:#0f172a}
+.usc-dark .usc-article-wrapper,.usc-dark .usc-faq-section-wrapper,.usc-dark .usc-related-calculators-wrapper,.usc-dark .usc-article-container,.usc-dark .usc-faq-container,.usc-dark .usc-related-calculators-container{background:#0f172a !important;color:#e2e8f0 !important}
+.usc-dark .usc-article-title,.usc-dark .usc-faq-section-title,.usc-dark .usc-related-section-title,.usc-dark .usc-article-content,.usc-dark .usc-article-content *,.usc-dark .usc-article-preview p{color:#e2e8f0 !important}
+.usc-dark .usc-faq-item,.usc-dark .usc-faq-question,.usc-dark .usc-faq-answer p{color:#e2e8f0 !important;background:#1e293b !important}
+.usc-dark .usc-faq-item{border-color:#334155 !important}
+.usc-dark .usc-related-card{background:#1e293b !important;border-color:#334155 !important}
+.usc-dark .usc-related-card h3{color:#f1f5f9 !important}
+.usc-dark .usc-related-card p{color:#94a3b8 !important}
+.usc-dark .usc-tool-btn{background:#1e293b;color:#e2e8f0;border-color:#334155}
+body.usc-embed-mode{background:#fff;margin:0;padding:0}
+body.usc-embed-mode .usc-article-wrapper,body.usc-embed-mode .usc-faq-section-wrapper,body.usc-embed-mode .usc-related-calculators-wrapper,body.usc-embed-mode .usc-dark-toggle{display:none !important}
+@media print{
+  .usc-dark-toggle,.usc-tool-actions,.usc-action-buttons,.usc-comparison-box,.usc-ads-container,.usc-related-calculators-wrapper,.usc-read-full-wrap,#usc-lead-capture-box{display:none !important}
+  body,.usc-calculator-page-wrapper{background:#fff !important}
+}
+</style>';
 ?>
 <div class="usc-calculator-page-wrapper">
+    <?php if (!$usc_is_embed) : ?><button type="button" id="usc-dark-toggle" class="usc-dark-toggle" onclick="uscToggleDark(this)" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button><?php endif; ?>
     <div class="page">
         <!-- Banner Header -->
         <div class="banner">
@@ -262,6 +331,10 @@ echo '<style>
                 <div class="usc-action-buttons" id="usc-action-buttons" style="display: none; margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
                     <button type="button" class="usc-action-btn-again" onclick="uscCalculateAgain()">🔄 CALCULATE AGAIN</button>
                     <button type="button" class="usc-action-btn-print" onclick="window.print()">🖨️ PRINT DETAILS REPORT</button>
+                    <div class="usc-tool-actions">
+                        <button type="button" class="usc-tool-btn" onclick="uscShareCalc()">🔗 Share</button>
+                        <button type="button" class="usc-tool-btn" onclick="uscCopyEmbed()">&lt;/&gt; Embed</button>
+                    </div>
                 </div>
                 <?php
             }
@@ -729,5 +802,55 @@ function uscCalculateAgain() {
     }
 })();
 </script>
+<script data-cfasync="false">
+/* ---- Share / Embed / Dark-mode features ---- */
+function uscShowToast(msg){
+  var t=document.getElementById('usc-toast');
+  if(!t){t=document.createElement('div');t.id='usc-toast';t.className='usc-toast';document.body.appendChild(t);}
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(window.__uscToastT);window.__uscToastT=setTimeout(function(){t.classList.remove('show');},2200);
+}
+function uscFallbackCopy(text,okMsg){
+  try{var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);uscShowToast(okMsg);}
+  catch(e){window.prompt('Copy this:',text);}
+}
+function uscCopyText(text,okMsg){
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){uscShowToast(okMsg);},function(){uscFallbackCopy(text,okMsg);});}
+  else{uscFallbackCopy(text,okMsg);}
+}
+function uscShareCalc(){
+  var url=window.location.href.split('#')[0].split('?')[0];
+  if(navigator.share){navigator.share({title:document.title,url:url}).catch(function(){});}
+  else{uscCopyText(url,'Link copied to clipboard!');}
+}
+function uscCopyEmbed(){
+  var url=window.location.href.split('#')[0].split('?')[0];
+  var src=url+'?embed=1';
+  var code='<iframe src="'+src+'" width="100%" height="900" style="border:1px solid #e5e7eb;border-radius:12px;max-width:680px;" loading="lazy" title="'+document.title.replace(/"/g,'')+'"></iframe>';
+  uscCopyText(code,'Embed code copied!');
+}
+function uscToggleDark(btn){
+  var w=document.querySelector('.usc-calculator-page-wrapper');
+  if(!w)return;
+  var on=w.classList.toggle('usc-dark');
+  try{localStorage.setItem('uscDarkMode',on?'1':'0');}catch(e){}
+  if(btn)btn.textContent=on?'☀️':'🌙';
+}
+(function(){
+  try{
+    if(localStorage.getItem('uscDarkMode')==='1'){
+      var w=document.querySelector('.usc-calculator-page-wrapper');
+      if(w)w.classList.add('usc-dark');
+      var b=document.getElementById('usc-dark-toggle');
+      if(b)b.textContent='☀️';
+    }
+  }catch(e){}
+})();
+</script>
 <?php
-get_footer();
+if ($usc_is_embed) {
+    wp_footer();
+    echo '</body></html>';
+} else {
+    get_footer();
+}

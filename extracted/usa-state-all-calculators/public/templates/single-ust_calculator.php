@@ -3,7 +3,12 @@
  * Single post template fallback for USA State Tax Calculators
  */
 
-get_header();
+$ust_is_embed = (isset($_GET['embed']) && $_GET['embed'] === '1');
+if ($ust_is_embed) {
+    ?><!DOCTYPE html><html <?php language_attributes(); ?>><head><meta charset="<?php bloginfo('charset'); ?>"><meta name="viewport" content="width=device-width, initial-scale=1"><?php wp_head(); ?></head><body <?php body_class('usc-embed-mode'); ?>><?php
+} else {
+    get_header();
+}
 
 $post_id = get_the_ID();
 $calc_type = get_post_meta($post_id, '_ust_calc_type', true);
@@ -121,8 +126,68 @@ echo '<style>
 .ust-tooltip:hover .ust-tooltiptext,.ust-tooltip:focus .ust-tooltiptext,.ust-tooltip.ust-tooltip-open .ust-tooltiptext{visibility:visible;opacity:1}
 @media(max-width:600px){.ust-tooltip .ust-tooltiptext{width:200px;margin-left:-100px}}
 </style>';
+
+/* ---- JSON-LD structured data for SEO (conflict-safe) ---- */
+$ust_title = get_the_title($post_id);
+$ust_seo_plugin_active = defined('WPSEO_VERSION') || defined('RANK_MATH_VERSION') || defined('AIOSEO_VERSION') || defined('SEOPRESS_VERSION');
+$ust_permalink = get_permalink($post_id);
+$ust_graph = [];
+$ust_graph[] = [
+    '@type' => 'WebApplication',
+    'name' => $ust_title,
+    'url' => $ust_permalink,
+    'applicationCategory' => 'FinanceApplication',
+    'operatingSystem' => 'All',
+    'browserRequirements' => 'Requires JavaScript',
+    'offers' => ['@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'USD'],
+    'description' => $seo_desc ? $seo_desc : $ust_title,
+];
+$ust_graph[] = [
+    '@type' => 'BreadcrumbList',
+    'itemListElement' => [
+        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => home_url('/')],
+        ['@type' => 'ListItem', 'position' => 2, 'name' => $ust_title, 'item' => $ust_permalink],
+    ],
+];
+if (!$ust_seo_plugin_active && !empty($faqs) && is_array($faqs)) {
+    $ust_faq_items = [];
+    foreach ($faqs as $faq) {
+        if (empty($faq['q']) || empty($faq['a'])) continue;
+        $ust_faq_items[] = [
+            '@type' => 'Question',
+            'name' => wp_strip_all_tags($faq['q']),
+            'acceptedAnswer' => ['@type' => 'Answer', 'text' => wp_strip_all_tags($faq['a'])],
+        ];
+    }
+    if (!empty($ust_faq_items)) {
+        $ust_graph[] = ['@type' => 'FAQPage', 'mainEntity' => $ust_faq_items];
+    }
+}
+echo '<script type="application/ld+json">' . wp_json_encode(['@context' => 'https://schema.org', '@graph' => $ust_graph]) . '</script>';
+
+/* ---- Feature styles: share/embed buttons, dark mode, print, embed ---- */
+echo '<style>
+.usc-tool-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:6px}
+.usc-tool-btn{display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:1.5px solid #e5e7eb;background:#fff;color:#374151;font-weight:700;font-size:13px;padding:9px 16px;border-radius:8px;transition:all .15s ease;font-family:inherit}
+.usc-tool-btn:hover{border-color:#dc2626;color:#dc2626;transform:translateY(-1px)}
+.usc-dark-toggle{position:fixed;right:16px;bottom:16px;z-index:9998;width:46px;height:46px;border-radius:50%;border:none;background:#1e293b;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;line-height:1}
+.usc-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#1e293b;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:10000;opacity:0;pointer-events:none;transition:all .25s ease;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.usc-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.usc-dark .usc-calculator-page-wrapper,.usc-calculator-page-wrapper.usc-dark{background:#0f172a}
+.usc-dark .usc-card{background:#1e293b !important;color:#e2e8f0 !important;border-color:#334155 !important}
+.usc-dark .usc-card h2,.usc-dark .usc-article-content,.usc-dark .usc-article-content *,.usc-dark .usc-article-preview p,.usc-dark .fxtool-faq__q,.usc-dark .fxtool-faq__a,.usc-dark .fxtool-faq__a *{color:#e2e8f0 !important}
+.usc-dark .fxtool-faq__item{background:#1e293b !important;border-color:#334155 !important}
+.usc-dark .usc-tool-btn{background:#1e293b;color:#e2e8f0;border-color:#334155}
+body.usc-embed-mode{background:#fff;margin:0;padding:0}
+body.usc-embed-mode .usc-card:not(:first-child),body.usc-embed-mode .usc-dark-toggle{display:none !important}
+@media print{
+  .usc-dark-toggle,.usc-tool-actions,.usc-action-buttons,.usc-comparison-box,#ust-col-adjuster,.usc-global-ad-container,.usc-read-full-wrap,#ust-lead-capture-box{display:none !important}
+  body,.usc-calculator-page-wrapper{background:#fff !important}
+}
+</style>';
 ?>
 <div class="usc-calculator-page-wrapper">
+    <?php if (!$ust_is_embed) : ?><button type="button" id="ust-dark-toggle" class="usc-dark-toggle" onclick="ustToggleDark(this)" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button><?php endif; ?>
     <div class="page" style="padding: 20px 10px;">
         <!-- Card 1: Calculator Card -->
         <div class="usc-card" style="padding: 0; overflow: hidden; margin-bottom: 24px;">
@@ -311,6 +376,10 @@ echo '<style>
                 <div class="usc-action-buttons" id="ust-action-buttons" style="display: none; margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
                     <button type="button" class="usc-action-btn-again" onclick="ustCalculateAgain()">🔄 CALCULATE AGAIN</button>
                     <button type="button" class="usc-action-btn-print" onclick="ustPrintReport()">🖨️ PRINT DETAILS REPORT</button>
+                    <div class="usc-tool-actions">
+                        <button type="button" class="usc-tool-btn" onclick="ustShareCalc()">🔗 Share</button>
+                        <button type="button" class="usc-tool-btn" onclick="ustCopyEmbed()">&lt;/&gt; Embed</button>
+                    </div>
                 </div>
 
                 <!-- Lead Capture Box (Hidden by default) -->
@@ -670,5 +739,55 @@ if (document.readyState !== "loading") {
     }
 })();
 </script>
+<script data-cfasync="false">
+/* ---- Share / Embed / Dark-mode features ---- */
+function ustShowToast(msg){
+  var t=document.getElementById('ust-toast');
+  if(!t){t=document.createElement('div');t.id='ust-toast';t.className='usc-toast';document.body.appendChild(t);}
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(window.__ustToastT);window.__ustToastT=setTimeout(function(){t.classList.remove('show');},2200);
+}
+function ustFallbackCopy(text,okMsg){
+  try{var ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);ustShowToast(okMsg);}
+  catch(e){window.prompt('Copy this:',text);}
+}
+function ustCopyText(text,okMsg){
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){ustShowToast(okMsg);},function(){ustFallbackCopy(text,okMsg);});}
+  else{ustFallbackCopy(text,okMsg);}
+}
+function ustShareCalc(){
+  var url=window.location.href.split('#')[0].split('?')[0];
+  if(navigator.share){navigator.share({title:document.title,url:url}).catch(function(){});}
+  else{ustCopyText(url,'Link copied to clipboard!');}
+}
+function ustCopyEmbed(){
+  var url=window.location.href.split('#')[0].split('?')[0];
+  var src=url+'?embed=1';
+  var code='<iframe src="'+src+'" width="100%" height="900" style="border:1px solid #e5e7eb;border-radius:12px;max-width:680px;" loading="lazy" title="'+document.title.replace(/"/g,'')+'"></iframe>';
+  ustCopyText(code,'Embed code copied!');
+}
+function ustToggleDark(btn){
+  var w=document.querySelector('.usc-calculator-page-wrapper');
+  if(!w)return;
+  var on=w.classList.toggle('usc-dark');
+  try{localStorage.setItem('uscDarkMode',on?'1':'0');}catch(e){}
+  if(btn)btn.textContent=on?'☀️':'🌙';
+}
+(function(){
+  try{
+    if(localStorage.getItem('uscDarkMode')==='1'){
+      var w=document.querySelector('.usc-calculator-page-wrapper');
+      if(w)w.classList.add('usc-dark');
+      var b=document.getElementById('ust-dark-toggle');
+      if(b)b.textContent='☀️';
+    }
+  }catch(e){}
+})();
+</script>
 <?php
-get_footer();
+if ($ust_is_embed) {
+    wp_footer();
+    echo '</body></html>';
+} else {
+    get_footer();
+}
