@@ -824,7 +824,7 @@ function uscCopyEmbed(){
 (function(){
   try {
     var KEY = 'uscScenarios::' + location.pathname;
-    var hasOwnSaver = !!document.getElementById('mortgage-scenarios-container');
+    var hasOwnSaver = !!document.querySelector('[id$="-scenarios-container"]');
     function root(){ return document.querySelector('.page .inner') || document.querySelector('.page') || document.body; }
     function load(){ try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ return []; } }
     function store(list){ try { localStorage.setItem(KEY, JSON.stringify(list.slice(-4))); } catch(e){} }

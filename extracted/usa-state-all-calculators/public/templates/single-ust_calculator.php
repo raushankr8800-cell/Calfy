@@ -783,6 +783,19 @@ function ustCopyEmbed(){
         var lbl = c.querySelector('.hero-lbl'), val = c.querySelector('.hero-val');
         if (lbl && val) results.push({ label: lbl.textContent.trim(), value: val.textContent.trim() });
       });
+      if (!results.length) {
+        var seen = {};
+        document.querySelectorAll('[id^="res-"]').forEach(function(el){
+          if (results.length >= 10 || el.offsetParent === null) return;
+          var txt = (el.textContent || '').trim();
+          if (!txt || txt.length > 24 || (txt.indexOf('$') === -1 && txt.indexOf('%') === -1)) return;
+          var suffix = el.id.replace(/^res-/, '');
+          if (seen[suffix]) return; seen[suffix] = 1;
+          var lblEl = document.getElementById('lbl-' + suffix);
+          var label = lblEl ? lblEl.textContent.trim() : suffix.replace(/-/g, ' ');
+          results.push({ label: label, value: txt });
+        });
+      }
       return { fields: fields, results: results };
     }
     window.ustSaveScenario = function(){
@@ -823,7 +836,12 @@ function ustCopyEmbed(){
       html += '</tbody></table></div>';
       panel.innerHTML = html;
     }
-    function init(){ renderCompare(); }
+    function init(){
+        if (document.querySelector('[id$="-scenarios-container"]')) {
+            document.querySelectorAll('[onclick="ustSaveScenario()"]').forEach(function(b){ b.style.display = 'none'; });
+        }
+        renderCompare();
+    }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   } catch(e){}
 })();
