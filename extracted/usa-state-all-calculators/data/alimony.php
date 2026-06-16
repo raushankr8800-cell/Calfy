@@ -295,7 +295,13 @@ function usc_get_alimony_templates($state_slug) {
 <div id="alimony-scenarios-container" style="margin-top: 24px; display: none;"></div>';
 
     // 2. ALIMONY CALCULATOR JS
-    $data['js'] = 'var payorPayType = "salary";
+    $data['js'] = 'var USAC_FED_DATA = ' . json_encode(ust_get_federal_tax_years()) . '; var USAC_FED_YEAR = "' . esc_js(usac_get_active_tax_year()) . '";
+function usacFedActive(){ return USAC_FED_DATA[USAC_FED_YEAR] || USAC_FED_DATA["2026"] || {}; }
+function usacFedKey(filing){ return (filing === "married") ? "married" : (filing === "head" || filing === "hoh") ? "head" : "single"; }
+function usacFedStdDeduction(filing){ var y = usacFedActive(); var k = usacFedKey(filing); return (y.standard_deduction && y.standard_deduction[k]) ? y.standard_deduction[k] : 0; }
+function usacFedSsCap(){ var y = usacFedActive(); return y.ss_wage_base ? y.ss_wage_base : 184500; }
+function usacFedCalc(taxable, filing){ var y = usacFedActive(); var br = (y.brackets && y.brackets[usacFedKey(filing)]) ? y.brackets[usacFedKey(filing)] : []; var tax = 0, prev = 0, marginal = 10; for (var i = 0; i < br.length; i++){ var lim = br[i].limit, rate = br[i].rate; if (taxable > prev){ tax += (Math.min(taxable, lim) - prev) * rate; marginal = Math.round(rate * 100); } if (taxable <= lim) break; prev = lim; } return { tax: tax, marginal: marginal }; }
+var payorPayType = "salary";
 var recipientPayType = "salary";
 var hasChildren = false;
 var stateSlug = "' . esc_js($state_slug) . '";
@@ -393,7 +399,7 @@ function estimateMonthlyTaxes(grossAnnual, filingStatus, stateSlug) {
     if (grossAnnual <= 0) return 0;
     
     // 1. FICA TAX
-    var socialSecurity = Math.min(grossAnnual, 184500) * 0.062;
+    var socialSecurity = Math.min(grossAnnual, usacFedSsCap()) * 0.062;
     var medicareLimit = (filingStatus === "married") ? 250000 : 200000;
     var medicare = grossAnnual * 0.0145;
     if (grossAnnual > medicareLimit) {
@@ -401,62 +407,10 @@ function estimateMonthlyTaxes(grossAnnual, filingStatus, stateSlug) {
     }
     var totalFica = socialSecurity + medicare;
     
-    // 2. FEDERAL INCOME TAX (2026 progressive brackets)
-    var standardDeduction = 16100;
-    if (filingStatus === "married") {
-        standardDeduction = 32200;
-    } else if (filingStatus === "hoh") {
-        standardDeduction = 24150;
-    }
-    
+    // 2. FEDERAL INCOME TAX (centralized, admin-editable federal data)
+    var standardDeduction = usacFedStdDeduction(filingStatus);
     var taxableFederal = Math.max(0, grossAnnual - standardDeduction);
-    var fedTax = 0;
-    
-    var brackets = [];
-    if (filingStatus === "married") {
-        brackets = [
-            { limit: 24800, rate: 0.10 },
-            { limit: 100800, rate: 0.12 },
-            { limit: 211400, rate: 0.22 },
-            { limit: 403550, rate: 0.24 },
-            { limit: 512450, rate: 0.32 },
-            { limit: 768700, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ];
-    } else if (filingStatus === "hoh") {
-        brackets = [
-            { limit: 17700, rate: 0.10 },
-            { limit: 67450, rate: 0.12 },
-            { limit: 105700, rate: 0.22 },
-            { limit: 201775, rate: 0.24 },
-            { limit: 256200, rate: 0.32 },
-            { limit: 640600, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ];
-    } else {
-        brackets = [
-            { limit: 12400, rate: 0.10 },
-            { limit: 50400, rate: 0.12 },
-            { limit: 105700, rate: 0.22 },
-            { limit: 201775, rate: 0.24 },
-            { limit: 256225, rate: 0.32 },
-            { limit: 640600, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ];
-    }
-    
-    var prevLimit = 0;
-    for (var i = 0; i < brackets.length; i++) {
-        var limit = brackets[i].limit;
-        var rate = brackets[i].rate;
-        if (taxableFederal > limit) {
-            fedTax += (limit - prevLimit) * rate;
-            prevLimit = limit;
-        } else {
-            fedTax += (taxableFederal - prevLimit) * rate;
-            break;
-        }
-    }
+    var fedTax = usacFedCalc(taxableFederal, filingStatus).tax;
     
     // 3. STATE INCOME TAX ESTIMATION
     var stateTax = 0;

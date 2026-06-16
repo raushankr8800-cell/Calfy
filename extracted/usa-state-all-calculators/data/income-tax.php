@@ -108,8 +108,65 @@ function ust_get_income_tax_data() {
  *
  * 2025 figures reflect final post-OBBBA values; 2026 figures reflect the
  * IRS inflation adjustments (Rev. Proc. 2025-32) and the SSA wage base.
+ *
+ * SINGLE SOURCE OF TRUTH: every calculator (paycheck, alimony, income tax,
+ * withholding) reads federal figures from here, and admin-panel edits stored
+ * in the 'usac_federal_overrides' option are merged in — so the numbers can be
+ * updated each year from the dashboard WITHOUT touching any code.
  */
 function ust_get_federal_tax_years() {
+    $defaults  = ust_get_federal_tax_years_defaults();
+    $overrides = get_option('usac_federal_overrides', []);
+    if (is_array($overrides)) {
+        foreach ($overrides as $year => $vals) {
+            if (!is_array($vals)) continue;
+            if (!isset($defaults[$year])) {
+                $defaults[$year] = ['standard_deduction' => [], 'ss_wage_base' => 0, 'medicare_threshold' => ['single' => 200000, 'married' => 250000, 'head' => 200000], 'brackets' => []];
+            }
+            if (!empty($vals['standard_deduction']) && is_array($vals['standard_deduction'])) {
+                foreach (['single', 'married', 'head'] as $fs) {
+                    if (isset($vals['standard_deduction'][$fs]) && is_numeric($vals['standard_deduction'][$fs])) {
+                        $defaults[$year]['standard_deduction'][$fs] = (int) $vals['standard_deduction'][$fs];
+                    }
+                }
+            }
+            if (isset($vals['ss_wage_base']) && is_numeric($vals['ss_wage_base'])) {
+                $defaults[$year]['ss_wage_base'] = (int) $vals['ss_wage_base'];
+            }
+            if (!empty($vals['brackets']) && is_array($vals['brackets'])) {
+                foreach (['single', 'married', 'head'] as $fs) {
+                    if (!empty($vals['brackets'][$fs]) && is_array($vals['brackets'][$fs])) {
+                        $clean = [];
+                        foreach ($vals['brackets'][$fs] as $b) {
+                            if (isset($b['limit'], $b['rate'])) {
+                                $clean[] = ['limit' => (float) $b['limit'], 'rate' => (float) $b['rate']];
+                            }
+                        }
+                        if ($clean) $defaults[$year]['brackets'][$fs] = $clean;
+                    }
+                }
+            }
+        }
+    }
+    return $defaults;
+}
+
+/**
+ * Returns the active tax year used by the calculators (admin-configurable),
+ * clamped to a year that actually has data.
+ */
+function usac_get_active_tax_year() {
+    $year = (string) get_option('usac_data_target_year', '2026');
+    $years = ust_get_federal_tax_years_defaults();
+    if (isset($years[$year])) return $year;
+    $keys = array_keys($years);
+    return end($keys) ?: '2026';
+}
+
+/**
+ * Default federal tax parameters by tax year (hardcoded baseline).
+ */
+function ust_get_federal_tax_years_defaults() {
     $base = ust_get_income_tax_data();
     return [
         '2025' => [

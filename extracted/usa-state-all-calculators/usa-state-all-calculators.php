@@ -3,7 +3,7 @@
  * Plugin Name: USA State All-in-One Calculators
  * Plugin URI: #
  * Description: All-in-One premium SEO-optimized calculator suite for all 50 US states. Includes Paycheck, Child Support, Alimony, Mortgage, Income Tax, Property Tax, and Sales Tax calculators. Auto-creates CPT pages with state-specific content and customizable HTML/CSS/JS editors.
- * Version: 2.3.0
+ * Version: 2.4.0
  * Author: AI Assistant
  * Text Domain: usa-state-all-calculators
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 define('USC_PATH', plugin_dir_path(__FILE__));
 define('USC_URL',  plugin_dir_url(__FILE__));
-define('USC_VERSION', '2.3.0');
+define('USC_VERSION', '2.4.0');
 define('USC_CPT', 'usc_calculator');
 
 // ============================================================
@@ -25,7 +25,7 @@ define('USC_CPT', 'usc_calculator');
 
 define('UST_PATH', plugin_dir_path(__FILE__));
 define('UST_URL',  plugin_dir_url(__FILE__));
-define('UST_VERSION', '2.3.0');
+define('UST_VERSION', '2.4.0');
 define('UST_CPT', 'ust_calculator');
 
 // ============================================================
@@ -1535,12 +1535,81 @@ function usac_render_data_sources_page() {
             update_option('usac_data_reminder_days', $days);
             echo '<div class="notice notice-success is-dismissible"><p><strong>Reminder settings saved.</strong></p></div>';
         }
+
+        if ($action === 'save_federal') {
+            $year = preg_replace('/[^0-9]/', '', (string) ($_POST['usac_fed_year'] ?? ''));
+            if (strlen($year) === 4) {
+                $ov = get_option('usac_federal_overrides', []);
+                if (!is_array($ov)) $ov = [];
+                $entry = [];
+                $sd = [];
+                foreach (['single', 'married', 'head'] as $fs) {
+                    $v = preg_replace('/[^0-9]/', '', (string) ($_POST['usac_sd_' . $fs] ?? ''));
+                    if ($v !== '') $sd[$fs] = (int) $v;
+                }
+                if ($sd) $entry['standard_deduction'] = $sd;
+                $ss = preg_replace('/[^0-9]/', '', (string) ($_POST['usac_ss'] ?? ''));
+                if ($ss !== '') $entry['ss_wage_base'] = (int) $ss;
+                $br = [];
+                foreach (['single', 'married', 'head'] as $fs) {
+                    $raw = (string) wp_unslash($_POST['usac_br_' . $fs] ?? '');
+                    $arr = [];
+                    foreach (preg_split('/\r\n|\r|\n/', $raw) as $line) {
+                        $line = trim($line);
+                        if ($line === '') continue;
+                        $parts = array_map('trim', explode(',', $line));
+                        if (count($parts) < 2) continue;
+                        $limStr = strtolower($parts[0]);
+                        $lim = (strpos($limStr, 'max') !== false || strpos($limStr, 'inf') !== false) ? 999999999999 : (float) preg_replace('/[^0-9.]/', '', $parts[0]);
+                        $rate = (float) preg_replace('/[^0-9.]/', '', $parts[1]);
+                        if ($rate > 1) $rate = $rate / 100;
+                        if ($lim > 0 && $rate >= 0) $arr[] = ['limit' => $lim, 'rate' => $rate];
+                    }
+                    if ($arr) $br[$fs] = $arr;
+                }
+                if ($br) $entry['brackets'] = $br;
+                if ($entry) {
+                    $ov[$year] = isset($ov[$year]) && is_array($ov[$year]) ? array_merge($ov[$year], $entry) : $entry;
+                    update_option('usac_federal_overrides', $ov);
+                    // mark the affected datasets reviewed
+                    foreach (['federal_income_tax', 'standard_deduction', 'fica_ss_wage_base'] as $k) {
+                        $meta[$k] = ['year' => $year, 'last_reviewed' => current_time('Y-m-d'), 'reviewer' => wp_get_current_user()->user_login, 'note' => 'Edited via admin'];
+                    }
+                    update_option('usac_data_freshness', $meta);
+                }
+                echo '<div class="notice notice-success is-dismissible"><p><strong>Federal figures saved for ' . esc_html($year) . '.</strong> Every calculator now uses these values automatically.</p></div>';
+            }
+        }
+
+        if ($action === 'reset_federal') {
+            $year = preg_replace('/[^0-9]/', '', (string) ($_POST['usac_fed_year'] ?? ''));
+            $ov = get_option('usac_federal_overrides', []);
+            if (is_array($ov) && isset($ov[$year])) {
+                unset($ov[$year]);
+                update_option('usac_federal_overrides', $ov);
+            }
+            echo '<div class="notice notice-success is-dismissible"><p><strong>Reset ' . esc_html($year) . ' to built-in defaults.</strong></p></div>';
+        }
     }
 
     $reminder_enabled = get_option('usac_data_reminder_enabled', '1');
     $reminder_email   = get_option('usac_data_reminder_email', '');
     if (!$reminder_email) $reminder_email = get_option('admin_email');
     $reminder_days    = (int) get_option('usac_data_reminder_days', 365);
+
+    // Prefill data for the federal figures editor (reflects current effective values incl. saved overrides)
+    $fed_all = ust_get_federal_tax_years();
+    $fed_year_key = isset($fed_all[$target_year]) ? $target_year : (string) array_key_last($fed_all);
+    $fed = isset($fed_all[$fed_year_key]) ? $fed_all[$fed_year_key] : reset($fed_all);
+    $fmt_brackets = function ($brs) {
+        $out = [];
+        foreach ((array) $brs as $b) {
+            $lim  = ($b['limit'] >= 999999999999) ? 'max' : (string) (int) $b['limit'];
+            $rate = rtrim(rtrim(number_format($b['rate'] * 100, 2, '.', ''), '0'), '.');
+            $out[] = $lim . ',' . $rate;
+        }
+        return implode("\n", $out);
+    };
 
     // Build rows + summary counts
     $current = 0; $outdated = 0; $review_due = 0;
@@ -1644,6 +1713,33 @@ function usac_render_data_sources_page() {
                 </p>
                 <button type="submit" class="button button-primary">Save reminder settings</button>
             </form>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;margin-top:18px;max-width:820px;">
+            <h2 style="margin-top:0;font-size:15px;display:flex;align-items:center;gap:6px;">✏️ Edit federal tax figures — no code needed</h2>
+            <p style="font-size:12.5px;color:#374151;">Update the numbers below once a year and <strong>every calculator</strong> (paycheck, alimony, income tax, withholding) uses them automatically. Leave a field blank to keep the built-in default.</p>
+            <form method="post">
+                <?php wp_nonce_field('usac_data_freshness', 'usac_data_nonce'); ?>
+                <input type="hidden" name="usac_data_action" value="save_federal">
+                <p style="font-size:13px;">Tax year: <input type="text" name="usac_fed_year" value="<?php echo esc_attr($fed_year_key); ?>" maxlength="4" style="width:70px;padding:5px 8px;"> <span style="color:#6b7280;">(matches the target year above)</span></p>
+                <div style="display:flex;gap:18px;flex-wrap:wrap;">
+                    <label style="font-size:12.5px;">Standard deduction — Single<br><input type="text" name="usac_sd_single" value="<?php echo esc_attr($fed['standard_deduction']['single'] ?? ''); ?>" style="width:130px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Married (jointly)<br><input type="text" name="usac_sd_married" value="<?php echo esc_attr($fed['standard_deduction']['married'] ?? ''); ?>" style="width:130px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Head of household<br><input type="text" name="usac_sd_head" value="<?php echo esc_attr($fed['standard_deduction']['head'] ?? ''); ?>" style="width:130px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Social Security wage base<br><input type="text" name="usac_ss" value="<?php echo esc_attr($fed['ss_wage_base'] ?? ''); ?>" style="width:140px;padding:5px 8px;"></label>
+                </div>
+                <p style="font-size:12px;color:#6b7280;margin:14px 0 4px;">Tax brackets — one per line as <code>upperLimit,ratePercent</code> (use <code>max</code> for the top bracket). Example: <code>12400,10</code></p>
+                <div style="display:flex;gap:14px;flex-wrap:wrap;">
+                    <label style="font-size:12.5px;">Single<br><textarea name="usac_br_single" rows="7" style="width:170px;font-family:monospace;font-size:12px;padding:6px;"><?php echo esc_textarea($fmt_brackets($fed['brackets']['single'] ?? [])); ?></textarea></label>
+                    <label style="font-size:12.5px;">Married (jointly)<br><textarea name="usac_br_married" rows="7" style="width:170px;font-family:monospace;font-size:12px;padding:6px;"><?php echo esc_textarea($fmt_brackets($fed['brackets']['married'] ?? [])); ?></textarea></label>
+                    <label style="font-size:12.5px;">Head of household<br><textarea name="usac_br_head" rows="7" style="width:170px;font-family:monospace;font-size:12px;padding:6px;"><?php echo esc_textarea($fmt_brackets($fed['brackets']['head'] ?? [])); ?></textarea></label>
+                </div>
+                <div style="margin-top:14px;display:flex;gap:10px;align-items:center;">
+                    <button type="submit" class="button button-primary">Save federal figures</button>
+                    <button type="submit" name="usac_data_action" value="reset_federal" class="button" onclick="return confirm('Reset this year to built-in defaults?');" style="color:#b91c1c;">Reset to defaults</button>
+                </div>
+            </form>
+            <p style="font-size:11.5px;color:#6b7280;margin-top:10px;">Note: 401(k)/HSA/FSA limits shown in calculator tooltips are informational text; state income-tax tables are edited per state in <code>data/income-tax.php</code>.</p>
         </div>
 
         <p style="font-size:12px;color:#6b7280;margin-top:14px;">💡 Tip: after you update a dataset in the code files shown above, come back here and click <strong>"Mark reviewed today"</strong> so the date and your username are recorded.</p>

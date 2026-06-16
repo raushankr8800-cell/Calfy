@@ -284,7 +284,13 @@ function usc_get_default_templates($type, $state_slug) {
 <div class="results" id="results"></div><div id="paycheck-scenarios-container" style="display: none;"></div>';
 
         // ADVANCED PAYCHECK CALCULATOR JS
-        $data['js'] = 'var payType = "salary";
+        $data['js'] = 'var USAC_FED_DATA = ' . json_encode(ust_get_federal_tax_years()) . '; var USAC_FED_YEAR = "' . esc_js(usac_get_active_tax_year()) . '";
+function usacFedActive(){ return USAC_FED_DATA[USAC_FED_YEAR] || USAC_FED_DATA["2026"] || {}; }
+function usacFedKey(filing){ return (filing === "married") ? "married" : (filing === "head") ? "head" : "single"; }
+function usacFedStdDeduction(filing){ var y = usacFedActive(); var k = usacFedKey(filing); return (y.standard_deduction && y.standard_deduction[k]) ? y.standard_deduction[k] : 0; }
+function usacFedSsCap(){ var y = usacFedActive(); return y.ss_wage_base ? y.ss_wage_base : 184500; }
+function usacFedCalc(taxable, filing){ var y = usacFedActive(); var br = (y.brackets && y.brackets[usacFedKey(filing)]) ? y.brackets[usacFedKey(filing)] : []; var tax = 0, prev = 0, marginal = 10; for (var i = 0; i < br.length; i++){ var lim = br[i].limit, rate = br[i].rate; if (taxable > prev){ tax += (Math.min(taxable, lim) - prev) * rate; marginal = Math.round(rate * 100); } if (taxable <= lim) break; prev = lim; } return { tax: tax, marginal: marginal }; }
+var payType = "salary";
 var filingStatus = "single";
 var stateSlug = "' . esc_js($state_slug) . '";
 var w4Expanded = false;
@@ -421,9 +427,8 @@ function calculatePaycheck(forceShow) {
     var stateExtra = parseFloat(document.getElementById("state-extra").value) || 0;
     var fedAllowances = parseFloat(document.getElementById("fed-allowances").value) || 0;
 
-    // 1. Calculate Federal Income Tax (2026 standard brackets lookup)
-    var standardDeduction = (filingStatus === "married") ? 32200 : 16100;
-    if (filingStatus === "head") standardDeduction = 24150;
+    // 1. Calculate Federal Income Tax (centralized, admin-editable federal data)
+    var standardDeduction = usacFedStdDeduction(filingStatus);
     if (w4Version === "new" && w4Deductions > 0) standardDeduction = w4Deductions;
 
     var taxableFed = 0;
@@ -435,34 +440,9 @@ function calculatePaycheck(forceShow) {
         taxableFed = Math.max(0, annualTaxableGross - (fedAllowances * 4300) - legacyDeduction);
     }
 
-    var fedTaxAnnual = 0;
-    var marginalRate = 10; // Lowest bracket
-
-    if (filingStatus === "single" || filingStatus === "married_separately") {
-        if (taxableFed <= 12400) { fedTaxAnnual = taxableFed * 0.10; marginalRate = 10; }
-        else if (taxableFed <= 50400) { fedTaxAnnual = 1240 + (taxableFed - 12400) * 0.12; marginalRate = 12; }
-        else if (taxableFed <= 105700) { fedTaxAnnual = 5800 + (taxableFed - 50400) * 0.22; marginalRate = 22; }
-        else if (taxableFed <= 201775) { fedTaxAnnual = 17966 + (taxableFed - 105700) * 0.24; marginalRate = 24; }
-        else if (taxableFed <= 256225) { fedTaxAnnual = 41024 + (taxableFed - 201775) * 0.32; marginalRate = 32; }
-        else if (taxableFed <= 640600) { fedTaxAnnual = 58448 + (taxableFed - 256225) * 0.35; marginalRate = 35; }
-        else { fedTaxAnnual = 192979.25 + (taxableFed - 640600) * 0.37; marginalRate = 37; }
-    } else if (filingStatus === "married") {
-        if (taxableFed <= 24800) { fedTaxAnnual = taxableFed * 0.10; marginalRate = 10; }
-        else if (taxableFed <= 100800) { fedTaxAnnual = 2480 + (taxableFed - 24800) * 0.12; marginalRate = 12; }
-        else if (taxableFed <= 211400) { fedTaxAnnual = 11600 + (taxableFed - 100800) * 0.22; marginalRate = 22; }
-        else if (taxableFed <= 403550) { fedTaxAnnual = 35932 + (taxableFed - 211400) * 0.24; marginalRate = 24; }
-        else if (taxableFed <= 512450) { fedTaxAnnual = 82048 + (taxableFed - 403550) * 0.32; marginalRate = 32; }
-        else if (taxableFed <= 768700) { fedTaxAnnual = 116896 + (taxableFed - 512450) * 0.35; marginalRate = 35; }
-        else { fedTaxAnnual = 206583.50 + (taxableFed - 768700) * 0.37; marginalRate = 37; }
-    } else {
-        if (taxableFed <= 17700) { fedTaxAnnual = taxableFed * 0.10; marginalRate = 10; }
-        else if (taxableFed <= 67450) { fedTaxAnnual = 1770 + (taxableFed - 17700) * 0.12; marginalRate = 12; }
-        else if (taxableFed <= 105700) { fedTaxAnnual = 7740 + (taxableFed - 67450) * 0.22; marginalRate = 22; }
-        else if (taxableFed <= 201775) { fedTaxAnnual = 16155 + (taxableFed - 105700) * 0.24; marginalRate = 24; }
-        else if (taxableFed <= 256200) { fedTaxAnnual = 39213 + (taxableFed - 201775) * 0.32; marginalRate = 32; }
-        else if (taxableFed <= 640600) { fedTaxAnnual = 56629 + (taxableFed - 256200) * 0.35; marginalRate = 35; }
-        else { fedTaxAnnual = 191169 + (taxableFed - 640600) * 0.37; marginalRate = 37; }
-    }
+    var fedCalcRes = usacFedCalc(taxableFed, filingStatus);
+    var fedTaxAnnual = fedCalcRes.tax;
+    var marginalRate = fedCalcRes.marginal;
 
     if (w4Version === "new") {
         if (w4MultipleJobs) fedTaxAnnual *= 1.25;
@@ -471,7 +451,7 @@ function calculatePaycheck(forceShow) {
     var fedTaxPerPay = (fedTaxAnnual / freq) + (w4Version === "new" ? w4ExtraWithholding : 0);
 
     // 2. Social Security & Medicare (FICA) Calculations
-    var ssCap = 184500;
+    var ssCap = usacFedSsCap();
     var ssTaxableAnnual = Math.min(annualTaxableGross, ssCap);
     var ssTaxPerPay = (ssTaxableAnnual * 0.062) / freq;
 

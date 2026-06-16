@@ -2781,46 +2781,18 @@ document.addEventListener("DOMContentLoaded", function() {
     </div>
 </div>';
 
-            $data['js'] = '
+            $data['js'] = 'const federalYears = ' . json_encode(ust_get_federal_tax_years()) . '; var USAC_FED_YEAR = "' . esc_js(usac_get_active_tax_year()) . '";
 function calculateWithholding() {
     const gross = parseFloat(document.getElementById("wh-gross").value) || 0;
     const freq = parseInt(document.getElementById("wh-freq").value) || 26;
     const status = document.getElementById("wh-status").value;
 
     const annualized = gross * freq;
-    const stdDeductions = { single: 16100, married: 32200, head: 24150 };
-    const stdDeduct = stdDeductions[status];
+    const fy = federalYears[USAC_FED_YEAR] || federalYears["2026"];
+    const stdDeduct = (fy.standard_deduction && fy.standard_deduction[status]) ? fy.standard_deduction[status] : fy.standard_deduction["single"];
     const taxable = Math.max(0, annualized - stdDeduct);
 
-    const brackets = {
-        single: [
-            { limit: 12400, rate: 0.10 },
-            { limit: 50400, rate: 0.12 },
-            { limit: 105700, rate: 0.22 },
-            { limit: 201775, rate: 0.24 },
-            { limit: 256225, rate: 0.32 },
-            { limit: 640600, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ],
-        married: [
-            { limit: 24800, rate: 0.10 },
-            { limit: 100800, rate: 0.12 },
-            { limit: 211400, rate: 0.22 },
-            { limit: 403550, rate: 0.24 },
-            { limit: 512450, rate: 0.32 },
-            { limit: 768700, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ],
-        head: [
-            { limit: 17700, rate: 0.10 },
-            { limit: 67450, rate: 0.12 },
-            { limit: 105700, rate: 0.22 },
-            { limit: 201775, rate: 0.24 },
-            { limit: 256200, rate: 0.32 },
-            { limit: 640600, rate: 0.35 },
-            { limit: Infinity, rate: 0.37 }
-        ]
-    };
+    const brackets = fy.brackets;
 
     let annualTax = 0;
     let tempTaxable = taxable;
