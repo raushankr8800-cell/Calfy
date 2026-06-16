@@ -3,7 +3,7 @@
  * Plugin Name: USA State All-in-One Calculators
  * Plugin URI: #
  * Description: All-in-One premium SEO-optimized calculator suite for all 50 US states. Includes Paycheck, Child Support, Alimony, Mortgage, Income Tax, Property Tax, and Sales Tax calculators. Auto-creates CPT pages with state-specific content and customizable HTML/CSS/JS editors.
- * Version: 2.6.2
+ * Version: 2.7.0
  * Author: AI Assistant
  * Text Domain: usa-state-all-calculators
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 define('USC_PATH', plugin_dir_path(__FILE__));
 define('USC_URL',  plugin_dir_url(__FILE__));
-define('USC_VERSION', '2.6.2');
+define('USC_VERSION', '2.7.0');
 define('USC_CPT', 'usc_calculator');
 
 // ============================================================
@@ -25,7 +25,7 @@ define('USC_CPT', 'usc_calculator');
 
 define('UST_PATH', plugin_dir_path(__FILE__));
 define('UST_URL',  plugin_dir_url(__FILE__));
-define('UST_VERSION', '2.6.2');
+define('UST_VERSION', '2.7.0');
 define('UST_CPT', 'ust_calculator');
 
 // ============================================================
@@ -555,6 +555,189 @@ register_deactivation_hook(__FILE__, 'usac_deactivate_plugin');
 function usac_deactivate_plugin() {
     wp_clear_scheduled_hook('usac_data_freshness_cron');
     flush_rewrite_rules();
+}
+
+// ============================================================
+// REPORT A PROBLEM — table, AJAX intake, and admin review
+// ============================================================
+
+/**
+ * Creates the problem-reports table if it does not already exist.
+ * Called on activation and lazily on admin_init (handles file-only updates).
+ */
+function usac_create_reports_table() {
+    global $wpdb;
+    $table   = $wpdb->prefix . 'usac_reports';
+    $charset = $wpdb->get_charset_collate();
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    dbDelta("CREATE TABLE $table (
+        id          BIGINT(20) NOT NULL AUTO_INCREMENT,
+        created_at  DATETIME NOT NULL,
+        post_id     BIGINT(20) DEFAULT 0,
+        calc_type   VARCHAR(50) DEFAULT '',
+        state       VARCHAR(80) DEFAULT '',
+        url         VARCHAR(500) DEFAULT '',
+        message     TEXT,
+        email       VARCHAR(200) DEFAULT '',
+        user_agent  VARCHAR(255) DEFAULT '',
+        status      VARCHAR(20) DEFAULT 'new',
+        PRIMARY KEY (id)
+    ) $charset;");
+}
+
+add_action('admin_init', 'usac_maybe_create_reports_table');
+function usac_maybe_create_reports_table() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'usac_reports';
+    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) !== $table) {
+        usac_create_reports_table();
+    }
+}
+
+// AJAX intake (logged-in and logged-out visitors)
+add_action('wp_ajax_usac_submit_report', 'usac_handle_report_submission');
+add_action('wp_ajax_nopriv_usac_submit_report', 'usac_handle_report_submission');
+function usac_handle_report_submission() {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'usac_report')) {
+        wp_send_json_error(['msg' => 'Security check failed. Please refresh and try again.'], 403);
+    }
+    $message = trim(sanitize_textarea_field(wp_unslash($_POST['message'] ?? '')));
+    if ($message === '') {
+        wp_send_json_error(['msg' => 'Please describe the problem before sending.'], 400);
+    }
+    if (mb_strlen($message) > 2000) {
+        $message = mb_substr($message, 0, 2000);
+    }
+
+    // Simple per-IP rate limit (max 5/hour)
+    $ip = isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : '0';
+    $rl_key = 'usac_rep_' . md5($ip);
+    $count  = (int) get_transient($rl_key);
+    if ($count >= 5) {
+        wp_send_json_error(['msg' => 'You have sent several reports already. Please try again later.'], 429);
+    }
+    set_transient($rl_key, $count + 1, HOUR_IN_SECONDS);
+
+    usac_maybe_create_reports_table();
+    global $wpdb;
+    $ok = $wpdb->insert($wpdb->prefix . 'usac_reports', [
+        'created_at' => current_time('mysql'),
+        'post_id'    => intval($_POST['post_id'] ?? 0),
+        'calc_type'  => sanitize_text_field(wp_unslash($_POST['calc_type'] ?? '')),
+        'state'      => sanitize_text_field(wp_unslash($_POST['state'] ?? '')),
+        'url'        => esc_url_raw(wp_unslash($_POST['url'] ?? '')),
+        'message'    => $message,
+        'email'      => sanitize_email(wp_unslash($_POST['email'] ?? '')),
+        'user_agent' => substr(sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 255),
+        'status'     => 'new',
+    ]);
+
+    if ($ok === false) {
+        wp_send_json_error(['msg' => 'Could not save your report. Please try again.'], 500);
+    }
+    update_option('usac_new_reports_count', (int) get_option('usac_new_reports_count', 0) + 1);
+    wp_send_json_success(['msg' => 'Thank you! Your report has been sent to our team.']);
+}
+
+/**
+ * Admin page: review and manage problem reports.
+ */
+function usac_render_reports_page() {
+    if (!current_user_can('manage_options')) wp_die('Unauthorized user.');
+    global $wpdb;
+    $table = $wpdb->prefix . 'usac_reports';
+    usac_maybe_create_reports_table();
+
+    // Handle actions
+    if (isset($_POST['usac_report_action'])) {
+        if (!isset($_POST['usac_report_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['usac_report_nonce'])), 'usac_reports_manage')) {
+            wp_die('Security check failed.');
+        }
+        $action = sanitize_text_field(wp_unslash($_POST['usac_report_action']));
+        $id = intval($_POST['report_id'] ?? 0);
+        if ($action === 'resolve' && $id) {
+            $wpdb->update($table, ['status' => 'resolved'], ['id' => $id]);
+        } elseif ($action === 'reopen' && $id) {
+            $wpdb->update($table, ['status' => 'new'], ['id' => $id]);
+        } elseif ($action === 'delete' && $id) {
+            $wpdb->delete($table, ['id' => $id]);
+        } elseif ($action === 'delete_resolved') {
+            $wpdb->query("DELETE FROM $table WHERE status = 'resolved'");
+        }
+    }
+
+    // Keep the menu badge accurate
+    $new_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE status = 'new'");
+    update_option('usac_new_reports_count', $new_count);
+
+    $filter = isset($_GET['rstatus']) ? sanitize_key($_GET['rstatus']) : 'new';
+    $where  = ($filter === 'resolved') ? "WHERE status='resolved'" : (($filter === 'all') ? '' : "WHERE status='new'");
+    $rows   = $wpdb->get_results("SELECT * FROM $table $where ORDER BY created_at DESC LIMIT 300");
+    $total  = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table");
+    $resolved_count = (int) $wpdb->get_var("SELECT COUNT(*) FROM $table WHERE status='resolved'");
+    ?>
+    <div class="wrap usc-admin-wrap">
+        <h1 style="display:flex;align-items:center;gap:8px;">🛠️ Problem Reports</h1>
+        <p style="font-size:13px;color:#374151;">Visitor-submitted problem reports from the calculators. Use these to spot data errors or bugs quickly.</p>
+
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin:16px 0;">
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:12px 18px;"><div style="font-size:22px;font-weight:800;color:#b91c1c;"><?php echo (int) $new_count; ?></div><div style="font-size:12px;color:#b91c1c;font-weight:600;">New</div></div>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 18px;"><div style="font-size:22px;font-weight:800;color:#16a34a;"><?php echo (int) $resolved_count; ?></div><div style="font-size:12px;color:#15803d;font-weight:600;">Resolved</div></div>
+            <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:12px 18px;"><div style="font-size:22px;font-weight:800;color:#374151;"><?php echo (int) $total; ?></div><div style="font-size:12px;color:#6b7280;font-weight:600;">Total</div></div>
+        </div>
+
+        <p>
+            <?php $base = admin_url('admin.php?page=usac_reports'); ?>
+            <a href="<?php echo esc_url(add_query_arg('rstatus', 'new', $base)); ?>" class="button <?php echo $filter === 'new' ? 'button-primary' : ''; ?>">New</a>
+            <a href="<?php echo esc_url(add_query_arg('rstatus', 'resolved', $base)); ?>" class="button <?php echo $filter === 'resolved' ? 'button-primary' : ''; ?>">Resolved</a>
+            <a href="<?php echo esc_url(add_query_arg('rstatus', 'all', $base)); ?>" class="button <?php echo $filter === 'all' ? 'button-primary' : ''; ?>">All</a>
+            <?php if ($resolved_count > 0) : ?>
+            <form method="post" style="display:inline;margin-left:10px;" onsubmit="return confirm('Delete all resolved reports?');">
+                <?php wp_nonce_field('usac_reports_manage', 'usac_report_nonce'); ?>
+                <input type="hidden" name="usac_report_action" value="delete_resolved">
+                <button type="submit" class="button" style="color:#b91c1c;">Delete all resolved</button>
+            </form>
+            <?php endif; ?>
+        </p>
+
+        <table class="widefat striped" style="background:#fff;">
+            <thead><tr>
+                <th style="width:130px;">When</th>
+                <th>Problem</th>
+                <th style="width:150px;">Calculator</th>
+                <th style="width:160px;">Contact / Page</th>
+                <th style="width:150px;">Actions</th>
+            </tr></thead>
+            <tbody>
+            <?php if (empty($rows)) : ?>
+                <tr><td colspan="5" style="padding:18px;text-align:center;color:#6b7280;">No reports in this view. 🎉</td></tr>
+            <?php else : foreach ($rows as $r) : ?>
+                <tr>
+                    <td style="font-size:12px;color:#374151;"><?php echo esc_html(mysql2date('M j, Y H:i', $r->created_at)); ?><br><span style="font-size:10.5px;color:<?php echo $r->status === 'new' ? '#b91c1c' : '#16a34a'; ?>;font-weight:700;text-transform:uppercase;"><?php echo esc_html($r->status); ?></span></td>
+                    <td style="font-size:13px;color:#111;"><?php echo nl2br(esc_html($r->message)); ?></td>
+                    <td style="font-size:12px;color:#374151;"><?php echo esc_html(ucwords(str_replace('-', ' ', $r->calc_type))); ?><?php echo $r->state ? '<br><span style="color:#6b7280;">' . esc_html(ucwords(str_replace('-', ' ', $r->state))) . '</span>' : ''; ?></td>
+                    <td style="font-size:11.5px;">
+                        <?php if ($r->email) : ?><a href="mailto:<?php echo esc_attr($r->email); ?>"><?php echo esc_html($r->email); ?></a><br><?php endif; ?>
+                        <?php if ($r->url) : ?><a href="<?php echo esc_url($r->url); ?>" target="_blank" rel="noopener">View page ↗</a><?php endif; ?>
+                    </td>
+                    <td>
+                        <form method="post" style="display:flex;flex-direction:column;gap:5px;">
+                            <?php wp_nonce_field('usac_reports_manage', 'usac_report_nonce'); ?>
+                            <input type="hidden" name="report_id" value="<?php echo (int) $r->id; ?>">
+                            <?php if ($r->status === 'new') : ?>
+                                <button type="submit" name="usac_report_action" value="resolve" class="button button-small button-primary">✓ Mark resolved</button>
+                            <?php else : ?>
+                                <button type="submit" name="usac_report_action" value="reopen" class="button button-small">↺ Reopen</button>
+                            <?php endif; ?>
+                            <button type="submit" name="usac_report_action" value="delete" class="button button-small" onclick="return confirm('Delete this report?');" style="color:#b91c1c;">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php
 }
 
 // ============================================================
@@ -1318,6 +1501,10 @@ function usac_register_admin_menus() {
     add_submenu_page('usac_calculators_hub', 'Tax Analytics', 'Tax Analytics', 'manage_options', 'ust_usage_analytics', 'ust_render_usage_page');
     add_submenu_page('usac_calculators_hub', 'Ads Settings', 'Ads Settings', 'manage_options', 'usac_ads_settings', 'usac_render_ads_settings_page');
     add_submenu_page('usac_calculators_hub', 'Data Sources & Freshness', '📅 Data Freshness', 'manage_options', 'usac_data_sources', 'usac_render_data_sources_page');
+
+    $usac_new_reports = (int) get_option('usac_new_reports_count', 0);
+    $usac_reports_label = '🛠️ Problem Reports' . ($usac_new_reports > 0 ? ' <span class="awaiting-mod">' . $usac_new_reports . '</span>' : '');
+    add_submenu_page('usac_calculators_hub', 'Problem Reports', $usac_reports_label, 'manage_options', 'usac_reports', 'usac_render_reports_page');
 }
 
 // Parent menu highlight for both CPTs

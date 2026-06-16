@@ -247,9 +247,65 @@ body.usc-embed-mode .usc-article-wrapper,body.usc-embed-mode .usc-faq-section-wr
 
         <!-- Calculator -->
         <div class="inner">
+            <?php
+            $usac_year = esc_html(usac_get_active_tax_year());
+            $usac_badge = '';
+            if ($calc_type === 'paycheck' || $calc_type === 'alimony') {
+                $usac_badge = '&#10003; Uses ' . $usac_year . ' federal tax figures (IRS and SSA)';
+            } elseif ($calc_type === 'mortgage') {
+                $usac_badge = '&#10003; ' . esc_html($state_name) . ' rates &amp; averages reviewed for ' . $usac_year;
+            } elseif ($calc_type === 'child-support') {
+                $usac_badge = '&#10003; Based on ' . esc_html($state_name) . ' child support guidelines';
+            }
+            if ($usac_badge !== '') {
+                echo '<div class="usac-trust-wrap"><span class="usac-trust-badge">' . $usac_badge . '</span></div>';
+            }
+            ?>
             <div class="usc-calculator-container">
                 <?php echo $calc_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
             </div>
+
+            <!-- Report a Problem -->
+            <div class="usac-report-wrap">
+                <button type="button" class="usac-report-toggle" onclick="usacToggleReport()">⚠️ Report a problem with this calculator</button>
+                <div class="usac-report-form" id="usac-report-form" style="display:none;">
+                    <textarea id="usac-report-msg" rows="3" placeholder="Describe the problem or the wrong result you noticed..."></textarea>
+                    <input type="email" id="usac-report-email" placeholder="Your email (optional, if you want a reply)">
+                    <div class="usac-report-actions">
+                        <button type="button" class="usac-report-send" onclick="usacSendReport(this)">Send report</button>
+                        <button type="button" class="usac-report-cancel" onclick="usacToggleReport()">Cancel</button>
+                    </div>
+                    <div class="usac-report-status" id="usac-report-status"></div>
+                </div>
+            </div>
+            <script data-cfasync="false">
+            (function(){
+                window.usacToggleReport = function(){ var f = document.getElementById('usac-report-form'); if (f) f.style.display = (f.style.display === 'none' ? 'block' : 'none'); };
+                window.usacSendReport = function(btn){
+                    var msgEl = document.getElementById('usac-report-msg');
+                    var statusEl = document.getElementById('usac-report-status');
+                    var msg = msgEl ? msgEl.value : '';
+                    if (!msg.trim()){ if (statusEl){ statusEl.textContent = 'Please describe the problem.'; statusEl.style.color = '#b91c1c'; } return; }
+                    btn.disabled = true; btn.textContent = 'Sending...';
+                    var data = new URLSearchParams();
+                    data.append('action', 'usac_submit_report');
+                    data.append('nonce', '<?php echo esc_js(wp_create_nonce('usac_report')); ?>');
+                    data.append('message', msg);
+                    data.append('email', (document.getElementById('usac-report-email') || {}).value || '');
+                    data.append('url', window.location.href);
+                    data.append('calc_type', '<?php echo esc_js($calc_type); ?>');
+                    data.append('state', '<?php echo esc_js($state_slug); ?>');
+                    data.append('post_id', '<?php echo (int) $post_id; ?>');
+                    fetch('<?php echo esc_js(admin_url('admin-ajax.php')); ?>', { method: 'POST', body: data, credentials: 'same-origin' })
+                        .then(function(r){ return r.json(); })
+                        .then(function(res){
+                            if (res && res.success){ if (statusEl){ statusEl.textContent = res.data.msg; statusEl.style.color = '#16a34a'; } if (msgEl) msgEl.value = ''; setTimeout(function(){ usacToggleReport(); btn.disabled = false; btn.textContent = 'Send report'; if (statusEl) statusEl.textContent = ''; }, 2500); }
+                            else { if (statusEl){ statusEl.textContent = (res && res.data && res.data.msg) || 'Could not send. Try again.'; statusEl.style.color = '#b91c1c'; } btn.disabled = false; btn.textContent = 'Send report'; }
+                        })
+                        .catch(function(){ if (statusEl){ statusEl.textContent = 'Network error. Please try again.'; statusEl.style.color = '#b91c1c'; } btn.disabled = false; btn.textContent = 'Send report'; });
+                };
+            })();
+            </script>
 
             <?php
             // Dynamic Comparison Section (Single, Clean, No Duplication)
