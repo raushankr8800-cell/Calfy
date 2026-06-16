@@ -94,15 +94,12 @@ class UST_CPT {
      */
     public function load_calculator_template($template) {
         if (is_singular('ust_calculator')) {
-            // Check if theme has single-ust_calculator.php
-            $theme_file = locate_template(['single-ust_calculator.php']);
-            if ($theme_file) {
-                return $theme_file;
-            }
-            // Fall back to plugin's built-in template
+            // Always use the plugin's built-in template so plugin updates ALWAYS take
+            // effect (previously an outdated theme copy could silently override it).
+            // A theme can still override intentionally via the 'ust_calculator_template' filter.
             $plugin_file = UST_PATH . 'public/templates/single-ust_calculator.php';
             if (file_exists($plugin_file)) {
-                return $plugin_file;
+                return apply_filters('ust_calculator_template', $plugin_file);
             }
         }
         return $template;

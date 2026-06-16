@@ -94,15 +94,12 @@ class USC_CPT {
      */
     public function load_calculator_template($template) {
         if (is_singular(USC_CPT)) {
-            // Check if theme has single-usc_calculator.php
-            $theme_file = locate_template(['single-' . USC_CPT . '.php']);
-            if ($theme_file) {
-                return $theme_file;
-            }
-            // Fall back to plugin's built-in template
+            // Always use the plugin's built-in template so plugin updates ALWAYS take
+            // effect (previously an outdated theme copy could silently override it).
+            // A theme can still override intentionally via the 'usc_calculator_template' filter.
             $plugin_file = USC_PATH . 'public/templates/single-usc_calculator.php';
             if (file_exists($plugin_file)) {
-                return $plugin_file;
+                return apply_filters('usc_calculator_template', $plugin_file);
             }
         }
         return $template;
