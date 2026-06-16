@@ -3,7 +3,7 @@
  * Plugin Name: USA State All-in-One Calculators
  * Plugin URI: #
  * Description: All-in-One premium SEO-optimized calculator suite for all 50 US states. Includes Paycheck, Child Support, Alimony, Mortgage, Income Tax, Property Tax, and Sales Tax calculators. Auto-creates CPT pages with state-specific content and customizable HTML/CSS/JS editors.
- * Version: 2.5.0
+ * Version: 2.6.0
  * Author: AI Assistant
  * Text Domain: usa-state-all-calculators
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) exit;
 
 define('USC_PATH', plugin_dir_path(__FILE__));
 define('USC_URL',  plugin_dir_url(__FILE__));
-define('USC_VERSION', '2.5.0');
+define('USC_VERSION', '2.6.0');
 define('USC_CPT', 'usc_calculator');
 
 // ============================================================
@@ -25,7 +25,7 @@ define('USC_CPT', 'usc_calculator');
 
 define('UST_PATH', plugin_dir_path(__FILE__));
 define('UST_URL',  plugin_dir_url(__FILE__));
-define('UST_VERSION', '2.5.0');
+define('UST_VERSION', '2.6.0');
 define('UST_CPT', 'ust_calculator');
 
 // ============================================================
@@ -1486,6 +1486,14 @@ function usac_get_data_sources_registry() {
     ];
 }
 
+/**
+ * Increments the data revision so calculator pages regenerate their stored
+ * HTML/JS (which bake in the federal/state figures) after an admin edit.
+ */
+function usac_bump_data_rev() {
+    update_option('usac_data_rev', (string) (intval(get_option('usac_data_rev', '0')) + 1));
+}
+
 function usac_render_data_sources_page() {
     if (!current_user_can('manage_options')) wp_die('Unauthorized user.');
 
@@ -1506,6 +1514,7 @@ function usac_render_data_sources_page() {
             if (strlen($ty) === 4) {
                 update_option('usac_data_target_year', $ty);
                 $target_year = $ty;
+                usac_bump_data_rev();
             }
             echo '<div class="notice notice-success is-dismissible"><p><strong>Target tax year saved.</strong></p></div>';
         }
@@ -1571,6 +1580,7 @@ function usac_render_data_sources_page() {
                 if ($entry) {
                     $ov[$year] = isset($ov[$year]) && is_array($ov[$year]) ? array_merge($ov[$year], $entry) : $entry;
                     update_option('usac_federal_overrides', $ov);
+                    usac_bump_data_rev();
                     // mark the affected datasets reviewed
                     foreach (['federal_income_tax', 'standard_deduction', 'fica_ss_wage_base'] as $k) {
                         $meta[$k] = ['year' => $year, 'last_reviewed' => current_time('Y-m-d'), 'reviewer' => wp_get_current_user()->user_login, 'note' => 'Edited via admin'];
@@ -1587,6 +1597,7 @@ function usac_render_data_sources_page() {
             if (is_array($ov) && isset($ov[$year])) {
                 unset($ov[$year]);
                 update_option('usac_federal_overrides', $ov);
+                usac_bump_data_rev();
             }
             echo '<div class="notice notice-success is-dismissible"><p><strong>Reset ' . esc_html($year) . ' to built-in defaults.</strong></p></div>';
         }
@@ -1623,18 +1634,44 @@ function usac_render_data_sources_page() {
                 if ($arr) $entry['brackets'] = $arr;
                 $sov[$slug] = $entry;
                 update_option('usac_state_overrides', $sov);
-                echo '<div class="notice notice-success is-dismissible"><p><strong>' . esc_html(ucwords(str_replace('-', ' ', $slug))) . ' state income tax saved.</strong> The income tax calculator now uses it.</p></div>';
+
+                // Property tax (entered as %, stored as decimal)
+                $pt_entry = [];
+                $ptr = (string) ($_POST['usac_pt_rate'] ?? '');
+                if ($ptr !== '') $pt_entry['rate'] = ((float) preg_replace('/[^0-9.]/', '', $ptr)) / 100;
+                $ptar = (string) ($_POST['usac_pt_ar'] ?? '');
+                if ($ptar !== '') $pt_entry['assessment_ratio'] = ((float) preg_replace('/[^0-9.]/', '', $ptar)) / 100;
+                if ($pt_entry) { $pov = get_option('usac_pt_overrides', []); if (!is_array($pov)) $pov = []; $pov[$slug] = $pt_entry; update_option('usac_pt_overrides', $pov); }
+
+                // Sales tax (entered as %, stored as decimal)
+                $sl_entry = [];
+                $slr = (string) ($_POST['usac_sl_rate'] ?? '');
+                if ($slr !== '') $sl_entry['rate'] = ((float) preg_replace('/[^0-9.]/', '', $slr)) / 100;
+                $sll = (string) ($_POST['usac_sl_local'] ?? '');
+                if ($sll !== '') $sl_entry['avg_local'] = ((float) preg_replace('/[^0-9.]/', '', $sll)) / 100;
+                if ($sl_entry) { $slov = get_option('usac_sales_overrides', []); if (!is_array($slov)) $slov = []; $slov[$slug] = $sl_entry; update_option('usac_sales_overrides', $slov); }
+
+                // Mortgage (values stored as-is: $ for home/insurance, % number for tax/closing)
+                $mt_entry = [];
+                foreach (['homeValue' => 'usac_mt_home', 'taxRate' => 'usac_mt_taxrate', 'insurance' => 'usac_mt_ins', 'closingCostPct' => 'usac_mt_cc'] as $mkey => $mfield) {
+                    $mv = (string) ($_POST[$mfield] ?? '');
+                    if ($mv !== '') $mt_entry[$mkey] = (float) preg_replace('/[^0-9.]/', '', $mv);
+                }
+                if ($mt_entry) { $mov = get_option('usac_mortgage_overrides', []); if (!is_array($mov)) $mov = []; $mov[$slug] = $mt_entry; update_option('usac_mortgage_overrides', $mov); }
+
+                usac_bump_data_rev();
+                echo '<div class="notice notice-success is-dismissible"><p><strong>' . esc_html(ucwords(str_replace('-', ' ', $slug))) . ' data saved.</strong> Income tax, property tax, sales tax and mortgage calculators now use these values.</p></div>';
             }
         }
 
         if ($action === 'reset_state') {
             $slug = sanitize_key($_POST['usac_state_slug'] ?? '');
-            $sov = get_option('usac_state_overrides', []);
-            if (is_array($sov) && isset($sov[$slug])) {
-                unset($sov[$slug]);
-                update_option('usac_state_overrides', $sov);
+            foreach (['usac_state_overrides', 'usac_pt_overrides', 'usac_sales_overrides', 'usac_mortgage_overrides'] as $opt) {
+                $o = get_option($opt, []);
+                if (is_array($o) && isset($o[$slug])) { unset($o[$slug]); update_option($opt, $o); }
             }
-            echo '<div class="notice notice-success is-dismissible"><p><strong>Reset that state to built-in defaults.</strong></p></div>';
+            usac_bump_data_rev();
+            echo '<div class="notice notice-success is-dismissible"><p><strong>Reset that state to built-in defaults (income, property, sales &amp; mortgage).</strong></p></div>';
         }
     }
 
@@ -1664,6 +1701,16 @@ function usac_render_data_sources_page() {
     $st = $all_states[$sel_state];
     $st_brackets_text = !empty($st['brackets']) ? $fmt_brackets($st['brackets']) : '';
     $st_flat_display  = isset($st['flat_rate']) ? rtrim(rtrim(number_format($st['flat_rate'] * 100, 3, '.', ''), '0'), '.') : '';
+
+    // Prefill property / sales / mortgage data for the selected state
+    $pct = function ($v, $dec = 4) { return rtrim(rtrim(number_format((float) $v * 100, $dec, '.', ''), '0'), '.'); };
+    $num = function ($v) { return rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.'); };
+    $pt_all  = ust_get_property_tax_data();
+    $pt      = isset($pt_all[$sel_state]) ? $pt_all[$sel_state] : [];
+    $sl_all  = ust_get_sales_tax_data();
+    $sl      = isset($sl_all[$sel_state]) ? $sl_all[$sel_state] : [];
+    $mt_all  = usac_get_mortgage_state_data();
+    $mt      = isset($mt_all[$sel_state]) ? $mt_all[$sel_state] : [];
 
     // Build rows + summary counts
     $current = 0; $outdated = 0; $review_due = 0;
@@ -1797,8 +1844,8 @@ function usac_render_data_sources_page() {
         </div>
 
         <div style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;margin-top:18px;max-width:820px;">
-            <h2 style="margin-top:0;font-size:15px;display:flex;align-items:center;gap:6px;">🗺️ Edit state income tax — no code needed</h2>
-            <p style="font-size:12.5px;color:#374151;">Pick a state and update its income-tax rule. Saved values are used by the Income Tax &amp; Paycheck calculators automatically.</p>
+            <h2 style="margin-top:0;font-size:15px;display:flex;align-items:center;gap:6px;">🗺️ Edit state data — no code needed</h2>
+            <p style="font-size:12.5px;color:#374151;">Pick a state and update its income tax, property tax, sales tax and mortgage defaults. Saved values are used by all the relevant calculators automatically.</p>
             <form method="get" style="margin-bottom:12px;">
                 <input type="hidden" name="page" value="usac_data_sources">
                 <label style="font-size:13px;font-weight:700;">State: </label>
@@ -1823,7 +1870,31 @@ function usac_render_data_sources_page() {
                 </div>
                 <p style="font-size:12px;color:#6b7280;margin:14px 0 4px;">Graduated brackets — one per line as <code>upperLimit,ratePercent</code> (use <code>max</code> for the top bracket). Leave blank for flat / no-tax states.</p>
                 <textarea name="usac_state_brackets" rows="6" style="width:280px;font-family:monospace;font-size:12px;padding:6px;"><?php echo esc_textarea($st_brackets_text); ?></textarea>
-                <div style="margin-top:14px;display:flex;gap:10px;">
+
+                <hr style="margin:18px 0;border:none;border-top:1px solid #eee;">
+                <strong style="font-size:13px;">🏠 Property tax</strong>
+                <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;">
+                    <label style="font-size:12.5px;">Effective rate %<br><input type="text" name="usac_pt_rate" value="<?php echo esc_attr(isset($pt['rate']) ? $pct($pt['rate']) : ''); ?>" style="width:110px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Assessment ratio %<br><input type="text" name="usac_pt_ar" value="<?php echo esc_attr(isset($pt['assessment_ratio']) ? $pct($pt['assessment_ratio']) : ''); ?>" style="width:120px;padding:5px 8px;"></label>
+                </div>
+
+                <hr style="margin:18px 0;border:none;border-top:1px solid #eee;">
+                <strong style="font-size:13px;">🛒 Sales tax</strong>
+                <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;">
+                    <label style="font-size:12.5px;">State rate %<br><input type="text" name="usac_sl_rate" value="<?php echo esc_attr(isset($sl['rate']) ? $pct($sl['rate']) : ''); ?>" style="width:110px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Avg local rate %<br><input type="text" name="usac_sl_local" value="<?php echo esc_attr(isset($sl['avg_local']) ? $pct($sl['avg_local']) : ''); ?>" style="width:120px;padding:5px 8px;"></label>
+                </div>
+
+                <hr style="margin:18px 0;border:none;border-top:1px solid #eee;">
+                <strong style="font-size:13px;">🏦 Mortgage defaults</strong>
+                <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;">
+                    <label style="font-size:12.5px;">Median home value $<br><input type="text" name="usac_mt_home" value="<?php echo esc_attr(isset($mt['homeValue']) ? (int) $mt['homeValue'] : ''); ?>" style="width:130px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Property tax rate %<br><input type="text" name="usac_mt_taxrate" value="<?php echo esc_attr(isset($mt['taxRate']) ? $num($mt['taxRate']) : ''); ?>" style="width:120px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Insurance $/yr<br><input type="text" name="usac_mt_ins" value="<?php echo esc_attr(isset($mt['insurance']) ? (int) $mt['insurance'] : ''); ?>" style="width:110px;padding:5px 8px;"></label>
+                    <label style="font-size:12.5px;">Closing cost %<br><input type="text" name="usac_mt_cc" value="<?php echo esc_attr(isset($mt['closingCostPct']) ? $num($mt['closingCostPct']) : ''); ?>" style="width:110px;padding:5px 8px;"></label>
+                </div>
+
+                <div style="margin-top:18px;display:flex;gap:10px;">
                     <button type="submit" class="button button-primary">Save state</button>
                     <button type="submit" name="usac_data_action" value="reset_state" class="button" onclick="return confirm('Reset this state to built-in defaults?');" style="color:#b91c1c;">Reset state</button>
                 </div>

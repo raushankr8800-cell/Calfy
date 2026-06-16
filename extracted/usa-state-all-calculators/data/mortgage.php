@@ -6,6 +6,82 @@
 if (!defined('ABSPATH')) exit;
 
 /**
+ * Mortgage state defaults (50 states) with admin overrides
+ * (option 'usac_mortgage_overrides') merged in — editable from the dashboard.
+ */
+function usac_get_mortgage_state_data() {
+    $data = usac_get_mortgage_state_data_defaults();
+    $ov   = get_option('usac_mortgage_overrides', []);
+    if (is_array($ov)) {
+        foreach ($ov as $slug => $vals) {
+            if (!is_array($vals) || !isset($data[$slug])) continue;
+            foreach (['homeValue', 'taxRate', 'insurance', 'closingCostPct'] as $f) {
+                if (isset($vals[$f]) && is_numeric($vals[$f])) $data[$slug][$f] = (float) $vals[$f];
+            }
+        }
+    }
+    return $data;
+}
+
+/**
+ * Built-in default mortgage state data.
+ */
+function usac_get_mortgage_state_data_defaults() {
+    return [
+        'alabama' => ['homeValue' => 220000, 'taxRate' => 0.40, 'insurance' => 1600, 'closingCostPct' => 2.0],
+        'alaska' => ['homeValue' => 350000, 'taxRate' => 1.04, 'insurance' => 1300, 'closingCostPct' => 2.5],
+        'arizona' => ['homeValue' => 430000, 'taxRate' => 0.51, 'insurance' => 1400, 'closingCostPct' => 2.0],
+        'arkansas' => ['homeValue' => 200000, 'taxRate' => 0.62, 'insurance' => 1800, 'closingCostPct' => 2.0],
+        'california' => ['homeValue' => 780000, 'taxRate' => 0.71, 'insurance' => 1700, 'closingCostPct' => 1.5],
+        'colorado' => ['homeValue' => 540000, 'taxRate' => 0.51, 'insurance' => 2400, 'closingCostPct' => 2.0],
+        'connecticut' => ['homeValue' => 380000, 'taxRate' => 1.96, 'insurance' => 1500, 'closingCostPct' => 2.5],
+        'delaware' => ['homeValue' => 370000, 'taxRate' => 0.43, 'insurance' => 1100, 'closingCostPct' => 3.0],
+        'florida' => ['homeValue' => 400000, 'taxRate' => 0.80, 'insurance' => 3600, 'closingCostPct' => 2.5],
+        'georgia' => ['homeValue' => 320000, 'taxRate' => 0.90, 'insurance' => 1700, 'closingCostPct' => 2.0],
+        'hawaii' => ['homeValue' => 840000, 'taxRate' => 0.29, 'insurance' => 1300, 'closingCostPct' => 2.0],
+        'idaho' => ['homeValue' => 450000, 'taxRate' => 0.49, 'insurance' => 1200, 'closingCostPct' => 2.0],
+        'illinois' => ['homeValue' => 270000, 'taxRate' => 2.08, 'insurance' => 1600, 'closingCostPct' => 2.5],
+        'indiana' => ['homeValue' => 230000, 'taxRate' => 0.83, 'insurance' => 1400, 'closingCostPct' => 2.0],
+        'iowa' => ['homeValue' => 210000, 'taxRate' => 1.52, 'insurance' => 1500, 'closingCostPct' => 2.0],
+        'kansas' => ['homeValue' => 220000, 'taxRate' => 1.34, 'insurance' => 2200, 'closingCostPct' => 2.0],
+        'kentucky' => ['homeValue' => 200000, 'taxRate' => 0.82, 'insurance' => 1600, 'closingCostPct' => 2.0],
+        'louisiana' => ['homeValue' => 210000, 'taxRate' => 0.56, 'insurance' => 2300, 'closingCostPct' => 2.0],
+        'maine' => ['homeValue' => 360000, 'taxRate' => 1.24, 'insurance' => 1200, 'closingCostPct' => 2.0],
+        'maryland' => ['homeValue' => 400000, 'taxRate' => 1.05, 'insurance' => 1400, 'closingCostPct' => 2.5],
+        'massachusetts' => ['homeValue' => 600000, 'taxRate' => 1.14, 'insurance' => 1600, 'closingCostPct' => 2.0],
+        'michigan' => ['homeValue' => 230000, 'taxRate' => 1.38, 'insurance' => 1600, 'closingCostPct' => 2.0],
+        'minnesota' => ['homeValue' => 330000, 'taxRate' => 1.02, 'insurance' => 1800, 'closingCostPct' => 2.0],
+        'mississippi' => ['homeValue' => 180000, 'taxRate' => 0.65, 'insurance' => 1900, 'closingCostPct' => 2.0],
+        'missouri' => ['homeValue' => 240000, 'taxRate' => 0.93, 'insurance' => 1800, 'closingCostPct' => 2.0],
+        'montana' => ['homeValue' => 450000, 'taxRate' => 0.74, 'insurance' => 1500, 'closingCostPct' => 2.0],
+        'nebraska' => ['homeValue' => 250000, 'taxRate' => 1.63, 'insurance' => 2200, 'closingCostPct' => 2.0],
+        'nevada' => ['homeValue' => 430000, 'taxRate' => 0.59, 'insurance' => 1300, 'closingCostPct' => 2.0],
+        'new-hampshire' => ['homeValue' => 440000, 'taxRate' => 1.93, 'insurance' => 1200, 'closingCostPct' => 2.0],
+        'new-jersey' => ['homeValue' => 500000, 'taxRate' => 2.23, 'insurance' => 1400, 'closingCostPct' => 3.0],
+        'new-mexico' => ['homeValue' => 290000, 'taxRate' => 0.67, 'insurance' => 1400, 'closingCostPct' => 2.0],
+        'new-york' => ['homeValue' => 460000, 'taxRate' => 1.40, 'insurance' => 1600, 'closingCostPct' => 3.5],
+        'north-carolina' => ['homeValue' => 320000, 'taxRate' => 0.77, 'insurance' => 1500, 'closingCostPct' => 2.0],
+        'north-dakota' => ['homeValue' => 250000, 'taxRate' => 0.95, 'insurance' => 1700, 'closingCostPct' => 2.0],
+        'ohio' => ['homeValue' => 220000, 'taxRate' => 1.53, 'insurance' => 1300, 'closingCostPct' => 2.0],
+        'oklahoma' => ['homeValue' => 200000, 'taxRate' => 0.85, 'insurance' => 2300, 'closingCostPct' => 2.0],
+        'oregon' => ['homeValue' => 500000, 'taxRate' => 0.93, 'insurance' => 1300, 'closingCostPct' => 2.0],
+        'pennsylvania' => ['homeValue' => 270000, 'taxRate' => 1.49, 'insurance' => 1200, 'closingCostPct' => 3.0],
+        'rhode-island' => ['homeValue' => 430000, 'taxRate' => 1.40, 'insurance' => 1500, 'closingCostPct' => 2.0],
+        'south-carolina' => ['homeValue' => 290000, 'taxRate' => 0.52, 'insurance' => 1700, 'closingCostPct' => 2.0],
+        'south-dakota' => ['homeValue' => 300000, 'taxRate' => 1.08, 'insurance' => 1800, 'closingCostPct' => 2.0],
+        'tennessee' => ['homeValue' => 310000, 'taxRate' => 0.66, 'insurance' => 1700, 'closingCostPct' => 2.0],
+        'texas' => ['homeValue' => 300000, 'taxRate' => 1.60, 'insurance' => 2700, 'closingCostPct' => 2.0],
+        'utah' => ['homeValue' => 510000, 'taxRate' => 0.52, 'insurance' => 1200, 'closingCostPct' => 2.0],
+        'vermont' => ['homeValue' => 380000, 'taxRate' => 1.73, 'insurance' => 1200, 'closingCostPct' => 2.0],
+        'virginia' => ['homeValue' => 380000, 'taxRate' => 0.87, 'insurance' => 1300, 'closingCostPct' => 2.0],
+        'washington' => ['homeValue' => 600000, 'taxRate' => 0.87, 'insurance' => 1400, 'closingCostPct' => 2.0],
+        'west-virginia' => ['homeValue' => 160000, 'taxRate' => 0.55, 'insurance' => 1400, 'closingCostPct' => 2.0],
+        'wisconsin' => ['homeValue' => 270000, 'taxRate' => 1.61, 'insurance' => 1300, 'closingCostPct' => 2.0],
+        'wyoming' => ['homeValue' => 330000, 'taxRate' => 0.55, 'insurance' => 1200, 'closingCostPct' => 2.0],
+    ];
+}
+
+/**
  * Returns default HTML, CSS, and JS for the Mortgage Calculator based on state
  */
 function usc_get_mortgage_templates($state_slug) {
@@ -216,59 +292,8 @@ function usc_get_mortgage_templates($state_slug) {
 var stateName = "' . esc_js($state_name) . '";
 var resultsCalculated = false;
 
-// Complete State Mortgage defaults database
-var mortgageStateDictionary = {
-    "alabama": { "homeValue": 220000, "taxRate": 0.40, "insurance": 1600, "closingCostPct": 2.0 },
-    "alaska": { "homeValue": 350000, "taxRate": 1.04, "insurance": 1300, "closingCostPct": 2.5 },
-    "arizona": { "homeValue": 430000, "taxRate": 0.51, "insurance": 1400, "closingCostPct": 2.0 },
-    "arkansas": { "homeValue": 200000, "taxRate": 0.62, "insurance": 1800, "closingCostPct": 2.0 },
-    "california": { "homeValue": 780000, "taxRate": 0.71, "insurance": 1700, "closingCostPct": 1.5 },
-    "colorado": { "homeValue": 540000, "taxRate": 0.51, "insurance": 2400, "closingCostPct": 2.0 },
-    "connecticut": { "homeValue": 380000, "taxRate": 1.96, "insurance": 1500, "closingCostPct": 2.5 },
-    "delaware": { "homeValue": 370000, "taxRate": 0.43, "insurance": 1100, "closingCostPct": 3.0 },
-    "florida": { "homeValue": 400000, "taxRate": 0.80, "insurance": 3600, "closingCostPct": 2.5 },
-    "georgia": { "homeValue": 320000, "taxRate": 0.90, "insurance": 1700, "closingCostPct": 2.0 },
-    "hawaii": { "homeValue": 840000, "taxRate": 0.29, "insurance": 1300, "closingCostPct": 2.0 },
-    "idaho": { "homeValue": 450000, "taxRate": 0.49, "insurance": 1200, "closingCostPct": 2.0 },
-    "illinois": { "homeValue": 270000, "taxRate": 2.08, "insurance": 1600, "closingCostPct": 2.5 },
-    "indiana": { "homeValue": 230000, "taxRate": 0.83, "insurance": 1400, "closingCostPct": 2.0 },
-    "iowa": { "homeValue": 210000, "taxRate": 1.52, "insurance": 1500, "closingCostPct": 2.0 },
-    "kansas": { "homeValue": 220000, "taxRate": 1.34, "insurance": 2200, "closingCostPct": 2.0 },
-    "kentucky": { "homeValue": 200000, "taxRate": 0.82, "insurance": 1600, "closingCostPct": 2.0 },
-    "louisiana": { "homeValue": 210000, "taxRate": 0.56, "insurance": 2300, "closingCostPct": 2.0 },
-    "maine": { "homeValue": 360000, "taxRate": 1.24, "insurance": 1200, "closingCostPct": 2.0 },
-    "maryland": { "homeValue": 400000, "taxRate": 1.05, "insurance": 1400, "closingCostPct": 2.5 },
-    "massachusetts": { "homeValue": 600000, "taxRate": 1.14, "insurance": 1600, "closingCostPct": 2.0 },
-    "michigan": { "homeValue": 230000, "taxRate": 1.38, "insurance": 1600, "closingCostPct": 2.0 },
-    "minnesota": { "homeValue": 330000, "taxRate": 1.02, "insurance": 1800, "closingCostPct": 2.0 },
-    "mississippi": { "homeValue": 180000, "taxRate": 0.65, "insurance": 1900, "closingCostPct": 2.0 },
-    "missouri": { "homeValue": 240000, "taxRate": 0.93, "insurance": 1800, "closingCostPct": 2.0 },
-    "montana": { "homeValue": 450000, "taxRate": 0.74, "insurance": 1500, "closingCostPct": 2.0 },
-    "nebraska": { "homeValue": 250000, "taxRate": 1.63, "insurance": 2200, "closingCostPct": 2.0 },
-    "nevada": { "homeValue": 430000, "taxRate": 0.59, "insurance": 1300, "closingCostPct": 2.0 },
-    "new-hampshire": { "homeValue": 440000, "taxRate": 1.93, "insurance": 1200, "closingCostPct": 2.0 },
-    "new-jersey": { "homeValue": 500000, "taxRate": 2.23, "insurance": 1400, "closingCostPct": 3.0 },
-    "new-mexico": { "homeValue": 290000, "taxRate": 0.67, "insurance": 1400, "closingCostPct": 2.0 },
-    "new-york": { "homeValue": 460000, "taxRate": 1.40, "insurance": 1600, "closingCostPct": 3.5 },
-    "north-carolina": { "homeValue": 320000, "taxRate": 0.77, "insurance": 1500, "closingCostPct": 2.0 },
-    "north-dakota": { "homeValue": 250000, "taxRate": 0.95, "insurance": 1700, "closingCostPct": 2.0 },
-    "ohio": { "homeValue": 220000, "taxRate": 1.53, "insurance": 1300, "closingCostPct": 2.0 },
-    "oklahoma": { "homeValue": 200000, "taxRate": 0.85, "insurance": 2300, "closingCostPct": 2.0 },
-    "oregon": { "homeValue": 500000, "taxRate": 0.93, "insurance": 1300, "closingCostPct": 2.0 },
-    "pennsylvania": { "homeValue": 270000, "taxRate": 1.49, "insurance": 1200, "closingCostPct": 3.0 },
-    "rhode-island": { "homeValue": 430000, "taxRate": 1.40, "insurance": 1500, "closingCostPct": 2.0 },
-    "south-carolina": { "homeValue": 290000, "taxRate": 0.52, "insurance": 1700, "closingCostPct": 2.0 },
-    "south-dakota": { "homeValue": 300000, "taxRate": 1.08, "insurance": 1800, "closingCostPct": 2.0 },
-    "tennessee": { "homeValue": 310000, "taxRate": 0.66, "insurance": 1700, "closingCostPct": 2.0 },
-    "texas": { "homeValue": 300000, "taxRate": 1.60, "insurance": 2700, "closingCostPct": 2.0 },
-    "utah": { "homeValue": 510000, "taxRate": 0.52, "insurance": 1200, "closingCostPct": 2.0 },
-    "vermont": { "homeValue": 380000, "taxRate": 1.73, "insurance": 1200, "closingCostPct": 2.0 },
-    "virginia": { "homeValue": 380000, "taxRate": 0.87, "insurance": 1300, "closingCostPct": 2.0 },
-    "washington": { "homeValue": 600000, "taxRate": 0.87, "insurance": 1400, "closingCostPct": 2.0 },
-    "west-virginia": { "homeValue": 160000, "taxRate": 0.55, "insurance": 1400, "closingCostPct": 2.0 },
-    "wisconsin": { "homeValue": 270000, "taxRate": 1.61, "insurance": 1300, "closingCostPct": 2.0 },
-    "wyoming": { "homeValue": 330000, "taxRate": 0.55, "insurance": 1200, "closingCostPct": 2.0 }
-};
+// Complete State Mortgage defaults database (centralized, admin-editable)
+var mortgageStateDictionary = ' . wp_json_encode(usac_get_mortgage_state_data()) . ';
 
 // Global trend arrays for interactive tooltips
 var globalBalanceTrend = [];

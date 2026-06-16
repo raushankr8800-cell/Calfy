@@ -6,9 +6,25 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Returns average property tax rates, assessment ratios, and county breakdowns for all 50 states
+ * Property tax data (50 states) with admin overrides (option 'usac_pt_overrides') merged in.
  */
 function ust_get_property_tax_data() {
+    $data = ust_get_property_tax_data_defaults();
+    $ov   = get_option('usac_pt_overrides', []);
+    if (is_array($ov)) {
+        foreach ($ov as $slug => $vals) {
+            if (!is_array($vals) || !isset($data[$slug])) continue;
+            if (isset($vals['rate']) && is_numeric($vals['rate']))                         $data[$slug]['rate']             = (float) $vals['rate'];
+            if (isset($vals['assessment_ratio']) && is_numeric($vals['assessment_ratio'])) $data[$slug]['assessment_ratio'] = (float) $vals['assessment_ratio'];
+        }
+    }
+    return $data;
+}
+
+/**
+ * Returns average property tax rates, assessment ratios, and county breakdowns for all 50 states
+ */
+function ust_get_property_tax_data_defaults() {
     return [
         'alabama' => ['rate' => 0.0040, 'assessment_ratio' => 0.10, 'counties' => [['name' => 'Jefferson County', 'rate' => 0.0055], ['name' => 'Mobile County', 'rate' => 0.0051], ['name' => 'Baldwin County', 'rate' => 0.0033]]],
         'alaska' => ['rate' => 0.0122, 'assessment_ratio' => 1.00, 'counties' => [['name' => 'Anchorage Municipality', 'rate' => 0.0132], ['name' => 'Fairbanks North Star Borough', 'rate' => 0.0125], ['name' => 'Matanuska-Susitna Borough', 'rate' => 0.0118]]],

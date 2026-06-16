@@ -6,9 +6,25 @@
 if (!defined('ABSPATH')) exit;
 
 /**
- * Returns average sales tax rates, state baseline rates, and major counties/cities details for all 50 states
+ * Sales tax data (50 states) with admin overrides (option 'usac_sales_overrides') merged in.
  */
 function ust_get_sales_tax_data() {
+    $data = ust_get_sales_tax_data_defaults();
+    $ov   = get_option('usac_sales_overrides', []);
+    if (is_array($ov)) {
+        foreach ($ov as $slug => $vals) {
+            if (!is_array($vals) || !isset($data[$slug])) continue;
+            if (isset($vals['rate']) && is_numeric($vals['rate']))           $data[$slug]['rate']      = (float) $vals['rate'];
+            if (isset($vals['avg_local']) && is_numeric($vals['avg_local'])) $data[$slug]['avg_local'] = (float) $vals['avg_local'];
+        }
+    }
+    return $data;
+}
+
+/**
+ * Returns average sales tax rates, state baseline rates, and major counties/cities details for all 50 states
+ */
+function ust_get_sales_tax_data_defaults() {
     return [
         'alabama' => ['rate' => 0.0400, 'avg_local' => 0.0529, 'counties' => [['name' => 'Jefferson County (Birmingham)', 'rate' => 0.1000], ['name' => 'Mobile County (Mobile)', 'rate' => 0.1000], ['name' => 'Montgomery County (Montgomery)', 'rate' => 0.0850]]],
         'alaska' => ['rate' => 0.0000, 'avg_local' => 0.0182, 'counties' => [['name' => 'Juneau City & Borough', 'rate' => 0.0500], ['name' => 'Kenai Peninsula Borough', 'rate' => 0.0300], ['name' => 'Ketchikan Gateway Borough', 'rate' => 0.0400]]],
