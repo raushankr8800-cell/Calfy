@@ -370,6 +370,7 @@ body.usc-embed-mode .usc-card:not(:first-child){display:none !important}
                     <button type="button" class="usc-action-btn-again" onclick="ustCalculateAgain()">🔄 CALCULATE AGAIN</button>
                     <button type="button" class="usc-action-btn-print" onclick="ustPrintReport()">🖨️ PRINT DETAILS REPORT</button>
                     <div class="usc-tool-actions">
+                        <button type="button" class="usc-tool-btn" onclick="ustSaveScenario()">💾 Save &amp; Compare</button>
                         <button type="button" class="usc-tool-btn" onclick="ustShareCalc()">🔗 Share</button>
                         <button type="button" class="usc-tool-btn" onclick="ustCopyEmbed()">&lt;/&gt; Embed</button>
                     </div>
@@ -759,6 +760,73 @@ function ustCopyEmbed(){
   var code='<iframe src="'+src+'" width="100%" height="900" style="border:1px solid #e5e7eb;border-radius:12px;max-width:680px;" loading="lazy" title="'+document.title.replace(/"/g,'')+'"></iframe>';
   ustCopyText(code,'Embed code copied!');
 }
+
+/* ---- Generic Save & Compare scenarios (additive, read-only, never breaks calc) ---- */
+(function(){
+  try {
+    var KEY = 'ustScenarios::' + location.pathname;
+    function root(){ return document.querySelector('.page .inner') || document.querySelector('.page') || document.body; }
+    function load(){ try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e){ return []; } }
+    function store(list){ try { localStorage.setItem(KEY, JSON.stringify(list.slice(-4))); } catch(e){} }
+    function snapshot(){
+      var r = root(), fields = [], results = [];
+      r.querySelectorAll('input, select').forEach(function(el){
+        if (['hidden','button','submit','checkbox','radio'].indexOf(el.type) > -1) return;
+        if (el.offsetParent === null) return;
+        var lbl = '', field = el.closest('.field');
+        if (field){ var l = field.querySelector('.lbl'); if (l) lbl = l.textContent.replace(/\u2139\ufe0f/g,'').trim(); }
+        if (!lbl) lbl = el.getAttribute('placeholder') || el.id || 'Field';
+        var val = (el.tagName === 'SELECT' && el.selectedIndex >= 0) ? el.options[el.selectedIndex].text : el.value;
+        if (val !== '' && val != null) fields.push({ label: lbl, value: String(val) });
+      });
+      document.querySelectorAll('.hero-card').forEach(function(c){
+        var lbl = c.querySelector('.hero-lbl'), val = c.querySelector('.hero-val');
+        if (lbl && val) results.push({ label: lbl.textContent.trim(), value: val.textContent.trim() });
+      });
+      return { fields: fields, results: results };
+    }
+    window.ustSaveScenario = function(){
+      try {
+        var snap = snapshot();
+        if (!snap.results.length && !snap.fields.length){ ustShowToast('Run a calculation first'); return; }
+        var list = load(); list.push(snap); store(list); renderCompare();
+        ustShowToast('Scenario saved (' + load().length + ')');
+        var p = document.getElementById('ust-compare-panel'); if (p) p.scrollIntoView({behavior:'smooth', block:'nearest'});
+      } catch(e){}
+    };
+    window.ustClearScenarios = function(){ try { localStorage.removeItem(KEY); var p=document.getElementById('ust-compare-panel'); if(p) p.remove(); ustShowToast('Comparison cleared'); } catch(e){} };
+    function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function renderCompare(){
+      var list = load();
+      var panel = document.getElementById('ust-compare-panel');
+      if (!list.length){ if (panel) panel.remove(); return; }
+      if (!panel){
+        panel = document.createElement('div');
+        panel.id = 'ust-compare-panel'; panel.className = 'usc-compare-panel';
+        var res = document.getElementById('results') || root();
+        if (res && res.parentNode) res.parentNode.insertBefore(panel, res.nextSibling); else root().appendChild(panel);
+      }
+      var html = '<div class="usc-compare-head"><strong>\ud83d\udcca Compare saved scenarios (' + list.length + ')</strong><button type="button" class="usc-tool-btn" onclick="ustClearScenarios()">Clear all</button></div>';
+      html += '<div class="usc-compare-scroll"><table class="usc-compare-table"><thead><tr><th>Metric</th>';
+      list.forEach(function(s, i){ html += '<th>Scenario ' + (i+1) + '</th>'; });
+      html += '</tr></thead><tbody>';
+      (list[0].results || []).forEach(function(r, ri){
+        html += '<tr class="usc-compare-result"><td>' + esc(r.label) + '</td>';
+        list.forEach(function(s){ html += '<td>' + esc((s.results[ri] && s.results[ri].value) || '\u2014') + '</td>'; });
+        html += '</tr>';
+      });
+      (list[0].fields || []).forEach(function(f, fi){
+        html += '<tr><td>' + esc(f.label) + '</td>';
+        list.forEach(function(s){ var fld = s.fields[fi]; html += '<td>' + esc((fld && fld.value) || '\u2014') + '</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      panel.innerHTML = html;
+    }
+    function init(){ renderCompare(); }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+  } catch(e){}
+})();
 </script>
 <?php
 if ($ust_is_embed) {

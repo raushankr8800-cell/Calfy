@@ -681,3 +681,18 @@
 @media (max-width: 600px) {
   .hero-grid { grid-template-columns: 1fr !important; }
 }
+
+
+/* ==========================================================================
+   SAVE & COMPARE SCENARIOS PANEL
+   ========================================================================== */
+.usc-compare-panel { margin: 18px 0; border: 1.5px solid #e5e7eb; border-radius: 12px; padding: 14px; background: #fff; }
+.usc-compare-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.usc-compare-head strong { font-size: 14px; }
+.usc-compare-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.usc-compare-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 320px; }
+.usc-compare-table th, .usc-compare-table td { border: 1px solid #e5e7eb; padding: 7px 9px; text-align: left; white-space: nowrap; }
+.usc-compare-table thead th { background: #f9fafb; font-weight: 700; }
+.usc-compare-table tr.usc-compare-result td { background: #fff7ed; font-weight: 700; color: #b45309; }
+.usc-compare-table td:first-child, .usc-compare-table th:first-child { position: sticky; left: 0; background: #fff; }
+.usc-compare-table thead th:first-child { background: #f9fafb; }
