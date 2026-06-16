@@ -237,19 +237,6 @@ body.usc-embed-mode .usc-card:not(:first-child){display:none !important}
                     <?php echo $calc_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
                 </div>
 
-                <!-- Report a Problem -->
-                <div class="usac-report-wrap">
-                    <button type="button" class="usac-report-toggle" onclick="usacToggleReport()">⚠️ Report a problem with this calculator</button>
-                    <div class="usac-report-form" id="usac-report-form" style="display:none;">
-                        <textarea id="usac-report-msg" rows="3" placeholder="Describe the problem or the wrong result you noticed..."></textarea>
-                        <input type="email" id="usac-report-email" placeholder="Your email (optional, if you want a reply)">
-                        <div class="usac-report-actions">
-                            <button type="button" class="usac-report-send" onclick="usacSendReport(this)">Send report</button>
-                            <button type="button" class="usac-report-cancel" onclick="usacToggleReport()">Cancel</button>
-                        </div>
-                        <div class="usac-report-status" id="usac-report-status"></div>
-                    </div>
-                </div>
                 <script data-cfasync="false">
                 (function(){
                     window.usacToggleReport = function(){ var f = document.getElementById('usac-report-form'); if (f) f.style.display = (f.style.display === 'none' ? 'block' : 'none'); };
@@ -426,6 +413,20 @@ body.usc-embed-mode .usc-card:not(:first-child){display:none !important}
                         <button type="button" class="usc-tool-btn" onclick="ustSaveScenario()">💾 Save &amp; Compare</button>
                         <button type="button" class="usc-tool-btn" onclick="ustShareCalc()">🔗 Share</button>
                         <button type="button" class="usc-tool-btn" onclick="ustCopyEmbed()">&lt;/&gt; Embed</button>
+                    </div>
+                </div>
+
+                <!-- Report a Problem -->
+                <div class="usac-report-wrap">
+                    <button type="button" class="usac-report-toggle" onclick="usacToggleReport()">⚠️ Report a problem with this calculator</button>
+                    <div class="usac-report-form" id="usac-report-form" style="display:none;">
+                        <textarea id="usac-report-msg" rows="3" placeholder="Describe the problem or the wrong result you noticed..."></textarea>
+                        <input type="email" id="usac-report-email" placeholder="Your email (optional, if you want a reply)">
+                        <div class="usac-report-actions">
+                            <button type="button" class="usac-report-send" onclick="usacSendReport(this)">Send report</button>
+                            <button type="button" class="usac-report-cancel" onclick="usacToggleReport()">Cancel</button>
+                        </div>
+                        <div class="usac-report-status" id="usac-report-status"></div>
                     </div>
                 </div>
 
