@@ -545,3 +545,24 @@
   background: #1f2937;
 }
 
+
+
+/* ==========================================================================
+   MOBILE RESPONSIVE / ANTI-OVERFLOW GUARDS
+   Prevents the page from "shrinking" (zooming out) on phones when result
+   content is wider than the viewport. Lives in the enqueued, version-busted
+   stylesheet so it reaches users even when page HTML is CDN-cached.
+   ========================================================================== */
+.usc-calculator-page-wrapper { max-width: 100%; overflow-x: hidden; }
+.usc-calculator-page-wrapper .page,
+.usc-calculator-page-wrapper .usc-card { overflow-x: hidden; }
+.hero-grid > *, .grid2 > * { min-width: 0; }
+.usc-calculator-page-wrapper img,
+.usc-calculator-page-wrapper canvas,
+.usc-calculator-page-wrapper svg,
+.usc-calculator-page-wrapper video { max-width: 100% !important; height: auto; }
+.usc-calculator-page-wrapper table { display: block; width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.usc-calculator-page-wrapper pre { white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 600px) {
+  .hero-grid { grid-template-columns: 1fr !important; }
+}
